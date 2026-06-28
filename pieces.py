@@ -1,4 +1,5 @@
 from enum import Enum, auto
+from random import shuffle
 
 
 class PieceType(Enum):
@@ -9,3 +10,7 @@ class PieceType(Enum):
     L_PIECE = auto()
     S_PIECE = auto()
     Z_PIECE = auto()
+
+
+def generate_random_bag() -> list[PieceType]:
+    return shuffle(list(PieceType))
