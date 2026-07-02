@@ -32,6 +32,5 @@ class Color(Enum):
     DARK_BLUE = auto()
     GREEN = auto()
     RED = auto()
-    BLACK = auto()
     CYAN = auto()
     BLACK = auto()

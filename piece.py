@@ -41,10 +41,73 @@ def generate_random_bag() -> list[PieceType]:
     shuffle(bag)
     return bag
 
+def get_anchor_point(piece_type: PieceType, orientation: PieceOrientation) -> tuple[int, int]:
+    match piece_type:
+        case PieceType.I_PIECE:
+            ...
+
+def get_i_piece_anchor_point(position: list[tuple[int, int]], orientation: PieceOrientation) -> tuple[int, int]:
+    min_i = min(i for i, j in position)
+    max_i = max(i for i, j in position)
+    min_j = min(j for i, j in position)
+    max_j = max(j for i, j in position)
+    match orientation:
+        case PieceOrientation.NORTH:
+            return (min_i + 1, min_j)
+        case PieceOrientation.EAST:
+            return (max_i, min_j - 2)
+        case PieceOrientation.SOUTH:
+            return (1, 2)
+        case PieceOrientation.WEST:
+            return (0, 1)
+
 
 def rotate_i_piece(matrix: list[list[int]], orientation: PieceOrientation, rotation: Rotation):
     ...
 
 
 def rotate_i_piece_visual(matrix: list[list[int]], orientation: PieceOrientation, rotation: Rotation):
-    ...
+    if orientation == PieceOrientation.NORTH:
+        if rotation == Rotation.CW:
+            return [[0, 0, 1, 0],
+                    [0, 0, 1, 0],
+                    [0, 0, 1, 0],
+                    [0, 0, 1, 0]], PieceOrientation.EAST
+        else:  # CCW
+            return [[0, 0, 1, 0],
+                    [0, 0, 1, 0],
+                    [0, 0, 1, 0],
+                    [0, 0, 1, 0]], PieceOrientation.WEST
+    elif orientation == PieceOrientation.EAST:
+        if rotation == Rotation.CW:
+            return [[1, 1, 1, 1],
+                    [0, 0, 0, 0],
+                    [0, 0, 0, 0],
+                    [0, 0, 0, 0]], PieceOrientation.SOUTH
+        else:  # CCW
+            return [[1, 1, 1, 1],
+                    [0, 0, 0, 0],
+                    [0, 0, 0, 0],
+                    [0, 0, 0, 0]], PieceOrientation.NORTH
+    elif orientation == PieceOrientation.SOUTH:
+        if rotation == Rotation.CW:
+            return [[1], 
+                    [1], 
+                    [1], 
+                    [1]], PieceOrientation.WEST
+        else: # CCW
+            return [[1], 
+                    [1], 
+                    [1], 
+                    [1]], PieceOrientation.EAST
+    elif orientation == PieceOrientation.WEST:
+        if rotation == Rotation.CW:
+            return [[1], 
+                    [1], 
+                    [1], 
+                    [1]], PieceOrientation.NORTH
+        else: # CCW
+            return [[1], 
+                    [1], 
+                    [1], 
+                    [1]], PieceOrientation.SOUTH
