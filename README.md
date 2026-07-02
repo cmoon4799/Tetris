@@ -32,7 +32,7 @@ Action Queue
 
 Rules
 - Spawning
-    - 3x2 pieces spwan on rows 21/22 and span from columns 4 to 6
+    - 3x2 pieces spawn on rows 21/22 and span from columns 4 to 6
     - I piece spawns on row 21 and spans from 4 to 7
     - O piece spawns on rows 21/22 and spans from columns 5 to 6
 - Lock Delay
@@ -48,6 +48,8 @@ Rules
 - Super Rotation
     - The Super Rotation System is an expanded rotation system that allows more flexibility and freedom of movement. It is designed to be intuitive.
     - If there is an obstruction, the game will attempt to shift the piece away from the obstruction.
+    - Wall Kick
+        - Well Detection
 
 TODO
 - Color
