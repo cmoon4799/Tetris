@@ -14,7 +14,7 @@ class PieceType(Enum):
 
 
 PIECE_TO_COLOR_MAP = {
-    PieceType.I_PIECE: Color.BLUE,
+    PieceType.I_PIECE: Color.LIGHT_BLUE,
     PieceType.O_PIECE: Color.YELLOW,
     PieceType.T_PIECE: Color.PURPLE,
     PieceType.J_PIECE: Color.DARK_BLUE,
@@ -31,7 +31,20 @@ class PieceOrientation(Enum):
     WEST = auto()
 
 
+class Rotation(Enum):
+    CW = auto()
+    CCW = auto()
+
+
 def generate_random_bag() -> list[PieceType]:
     bag = list(PieceType)
     shuffle(bag)
     return bag
+
+
+def rotate_i_piece(matrix: list[list[int]], orientation: PieceOrientation, rotation: Rotation):
+    ...
+
+
+def rotate_i_piece_visual(matrix: list[list[int]], orientation: PieceOrientation, rotation: Rotation):
+    ...

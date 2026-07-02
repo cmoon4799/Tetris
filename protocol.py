@@ -26,10 +26,12 @@ class InputManager(Protocol):
 
 class Color(Enum):
     YELLOW = auto()
-    CYAN = auto()
     PURPLE = auto()
     ORANGE = auto()
-    BLUE = auto()
+    LIGHT_BLUE = auto()
     DARK_BLUE = auto()
     GREEN = auto()
     RED = auto()
+    BLACK = auto()
+    CYAN = auto()
+    BLACK = auto()

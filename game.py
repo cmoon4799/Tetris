@@ -3,7 +3,7 @@ Core gameplay orchestration.
 """
 
 
-from pieces import PieceType, PieceOrientation, PIECE_TO_COLOR_MAP, generate_random_bag
+from piece import PieceType, PieceOrientation, PIECE_TO_COLOR_MAP, generate_random_bag
 from protocol import Action, InputManager, Color
 import pygame
 from collections import deque
@@ -75,18 +75,16 @@ class Game:
     CELL_SIZE = 30
     WINDOW_WIDTH = (MATRIX_WIDTH + 2) * CELL_SIZE
     WINDOW_HEIGHT = (MATRIX_HEIGHT + 4) * CELL_SIZE
-    BACKGROUND_COLOR = (25, 25, 25)
-    BLOCK_COLOR = (70, 180, 240)
-    GRID_COLOR = (55, 55, 55)
     COLOR_MAP = {
         Color.YELLOW: (255, 255, 0),
         Color.CYAN: (0, 255, 255),
         Color.PURPLE: (128, 0, 128),
         Color.ORANGE: (255, 165, 0),
-        Color.BLUE: (0, 128, 254),
+        Color.LIGHT_BLUE: (0, 128, 254),
         Color.DARK_BLUE: (25, 25, 112),
         Color.GREEN: (0, 128, 0),
         Color.RED: (255, 0, 0),
+        Color.BLACK: (25, 25, 25),
     }
 
     def __init__(self):
@@ -99,8 +97,8 @@ class Game:
 
         self.active_piece: ActivePiece | None = ActivePiece(PieceType.I_PIECE)
         self.action_queue: list[Action] = []
-        self.matrix: list[Color] = [[0 for _ in range(self.MATRIX_WIDTH)]
-                                    for _ in range(self.MATRIX_HEIGHT)]
+        self.matrix: list[list[int]] = [
+            [0 for _ in range(self.MATRIX_WIDTH)] for _ in range(self.MATRIX_HEIGHT)]
 
         pygame.init()
         self.screen = pygame.display.set_mode(
@@ -126,7 +124,7 @@ class Game:
         }
 
     def render(self):
-        self.screen.fill(self.BACKGROUND_COLOR)
+        self.screen.fill(self.COLOR_MAP[Color.BLACK])
 
         for i in range(self.MATRIX_HEIGHT):
             for j in range(self.MATRIX_WIDTH):
@@ -138,7 +136,8 @@ class Game:
                 if self.matrix[self.MATRIX_HEIGHT - 1 - i][j]:
                     color = self.COLOR_MAP[self.matrix[self.MATRIX_HEIGHT - 1 - i][j]]
                     pygame.draw.rect(self.screen, color, cell)
-                pygame.draw.rect(self.screen, self.GRID_COLOR, cell, width=1)
+                pygame.draw.rect(
+                    self.screen, self.COLOR_MAP[Color.CYAN], cell, width=1)
 
         for i, j in self.active_piece.position:
             x = (j + 1) * self.CELL_SIZE
@@ -236,6 +235,7 @@ class Game:
                 return True
             if i < 0:  # floor collision
                 return True
+            # matrix collision
             if i < self.MATRIX_HEIGHT and self.matrix[i][j]:
                 return True
 
@@ -254,7 +254,8 @@ class Game:
             self.saved_piece = active_piece_type
         self.save_disabled = True
 
-    def rotate_piece(self): ...
+    def rotate_piece(self):
+        ...
 
     def quit(self): ...
 
