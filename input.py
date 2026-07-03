@@ -1,9 +1,8 @@
-from shared import Action
-
-
 from abc import abstractmethod
 from collections import deque
 from typing import Protocol
+
+from shared import Action
 
 
 class InputManager(Protocol):
@@ -11,5 +10,4 @@ class InputManager(Protocol):
         self.input_queue = deque()
 
     @abstractmethod
-    def poll(self) -> list[Action]:
-        ...
+    def poll(self) -> list[Action]: ...

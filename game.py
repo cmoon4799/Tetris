@@ -2,14 +2,24 @@
 Core gameplay orchestration.
 """
 
-
-from input import InputManager
-from piece import ActivePiece, PieceType, generate_random_bag, rotate_i_piece, Rotation, rotate_t_piece, rotate_l_piece, rotate_j_piece
-from shared import Action, Color
-import pygame
 from collections import deque
 from enum import Enum, auto
+
+import pygame
+
+from input import InputManager
 from matrix import Matrix
+from piece import (
+    ActivePiece,
+    PieceType,
+    Rotation,
+    generate_random_bag,
+    rotate_i_piece,
+    rotate_j_piece,
+    rotate_l_piece,
+    rotate_t_piece,
+)
+from shared import Action, Color
 
 
 class PygameInputManager(InputManager):
@@ -76,11 +86,11 @@ class Game:
         self.active_piece: ActivePiece | None = ActivePiece(PieceType.J_PIECE)
         self.action_queue: list[Action] = []
         self.matrix: Matrix = Matrix(
-            matrix_height=self.MATRIX_HEIGHT, matrix_width=self.MATRIX_WIDTH)
+            matrix_height=self.MATRIX_HEIGHT, matrix_width=self.MATRIX_WIDTH
+        )
 
         pygame.init()
-        self.screen = pygame.display.set_mode(
-            (self.WINDOW_WIDTH, self.WINDOW_HEIGHT))
+        self.screen = pygame.display.set_mode((self.WINDOW_WIDTH, self.WINDOW_HEIGHT))
         self.clock = pygame.time.Clock()
         self.fps = 60  # frames per second
         self.frame_ticks = 0
@@ -104,8 +114,14 @@ class Game:
             Action.FALL: self.fall,
             Action.QUIT: self.quit,
         }
-        self.MOVEMENT_ACTIONS = {Action.RIGHT_SHIFT, Action.LEFT_SHIFT,
-                                 Action.SOFT_DROP, Action.HARD_DROP, Action.CW_ROTATE, Action.CCW_ROTATE}
+        self.MOVEMENT_ACTIONS = {
+            Action.RIGHT_SHIFT,
+            Action.LEFT_SHIFT,
+            Action.SOFT_DROP,
+            Action.HARD_DROP,
+            Action.CW_ROTATE,
+            Action.CCW_ROTATE,
+        }
 
         self.running = True
 
@@ -122,8 +138,7 @@ class Game:
                 if self.matrix[self.MATRIX_HEIGHT - 1 - i][j]:
                     color = self.COLOR_MAP[self.matrix[self.MATRIX_HEIGHT - 1 - i][j]]
                     pygame.draw.rect(self.screen, color, cell)
-                pygame.draw.rect(
-                    self.screen, self.COLOR_MAP[Color.CYAN], cell, width=1)
+                pygame.draw.rect(self.screen, self.COLOR_MAP[Color.CYAN], cell, width=1)
 
         for i, j in self.active_piece.position:
             x = (j + 1) * self.CELL_SIZE
@@ -168,8 +183,7 @@ class Game:
         self.lock_down_active = True
 
     def surface_contact(self):
-        new_position = self.get_active_piece_translation(
-            TranslateDirection.DOWN)
+        new_position = self.get_active_piece_translation(TranslateDirection.DOWN)
         return self.matrix.check_collision(new_position)
 
     def quit(self):
@@ -185,8 +199,7 @@ class Game:
                 return [(i, j + 1) for (i, j) in self.active_piece.position]
 
     def fall(self):
-        new_position = self.get_active_piece_translation(
-            TranslateDirection.DOWN)
+        new_position = self.get_active_piece_translation(TranslateDirection.DOWN)
         if self.matrix.check_collision(new_position):
             return
         self.active_piece.position = new_position
@@ -197,8 +210,7 @@ class Game:
         if not self.piece_bag:
             self.piece_bag = deque(generate_random_bag())
 
-    def reset(self):
-        ...
+    def reset(self): ...
 
     def lock_down(self):
         assert self.surface_contact(), "lock_down must only be called on surface contact"
@@ -211,23 +223,22 @@ class Game:
         self.pull_active_piece_from_queue()
 
     def hard_drop(self):
-        while not self.matrix.check_collision(self.get_active_piece_translation(TranslateDirection.DOWN)):
-            self.active_piece.position = self.get_active_piece_translation(
-                TranslateDirection.DOWN)
+        while not self.matrix.check_collision(
+            self.get_active_piece_translation(TranslateDirection.DOWN)
+        ):
+            self.active_piece.position = self.get_active_piece_translation(TranslateDirection.DOWN)
         self.lock_down()
 
     def soft_drop(self): ...
 
     def left_shift(self):
-        new_position = self.get_active_piece_translation(
-            TranslateDirection.LEFT)
+        new_position = self.get_active_piece_translation(TranslateDirection.LEFT)
         if self.matrix.check_collision(new_position):
             return
         self.active_piece.position = new_position
 
     def right_shift(self):
-        new_position = self.get_active_piece_translation(
-            TranslateDirection.RIGHT)
+        new_position = self.get_active_piece_translation(TranslateDirection.RIGHT)
         if self.matrix.check_collision(new_position):
             return
         self.active_piece.position = new_position
