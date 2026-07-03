@@ -11,5 +11,5 @@ class InputManager(Protocol):
         self.input_queue = deque()
 
     @abstractmethod
-    def poll(self) -> Action:
+    def poll(self) -> list[Action]:
         ...

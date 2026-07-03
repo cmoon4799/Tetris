@@ -8,9 +8,10 @@ class Action(Enum):
     LEFT_SHIFT = auto()
     SOFT_DROP = auto()
     HARD_DROP = auto()
-    SAVE = auto()
+    HOLD = auto()
     GRAVITY = auto()
     QUIT = auto()
+    FALL = auto()
 
 
 class Color(Enum):

@@ -19,7 +19,7 @@ class PygameInputManager(InputManager):
         pygame.K_UP: Action.CW_ROTATE,
         pygame.K_LCTRL: Action.CCW_ROTATE,
         pygame.K_SPACE: Action.HARD_DROP,
-        pygame.K_LSHIFT: Action.SAVE,
+        pygame.K_LSHIFT: Action.HOLD,
     }
 
     def poll(self) -> list[Action]:
@@ -30,6 +30,7 @@ class PygameInputManager(InputManager):
                 if event.key in self.KEY_TO_ACTION_MAP:
                     actions.append(self.KEY_TO_ACTION_MAP[event.key])
             if event.type == pygame.QUIT:
+                print("appending quit")
                 actions.append(Action.QUIT)
 
         return actions
@@ -69,8 +70,8 @@ class Game:
         self.piece_queue: deque[PieceType] = deque(generate_random_bag())
         # bag from which we grab pieces to enqueue
         self.piece_bag: deque[PieceType] = deque(generate_random_bag())
-        self.saved_piece: PieceType | None = None
-        self.save_disabled: bool = False
+        self.held_piece: PieceType | None = None
+        self.hold_disabled: bool = False
 
         self.active_piece: ActivePiece | None = ActivePiece(PieceType.L_PIECE)
         self.action_queue: list[Action] = []
@@ -84,10 +85,10 @@ class Game:
         self.fps = 60  # frames per second
         self.frame_ticks = 0
 
-        self.fall_speed = 0.8  # time it takes for the active piece to fall by one line
+        self.fall_speed = 0.8  # time in seconds it takes for the active piece to fall by one line
         self.fall_frame_rate = round(self.fall_speed * self.fps)
 
-        self.lock_down_speed = 0.5  # time until piece is locked
+        self.lock_down_speed = 0.5  # time in seconds until piece is locked
         self.lock_down_frame_rate = round(self.lock_down_speed * self.fps)
         self.lock_down_active = False
         self.lock_down_frame_ticks = 0
@@ -99,8 +100,14 @@ class Game:
             Action.HARD_DROP: self.hard_drop,
             Action.CW_ROTATE: self.cw_rotate,
             Action.CCW_ROTATE: self.ccw_rotate,
-            Action.SAVE: self.save_piece,
+            Action.HOLD: self.hold_piece,
+            Action.FALL: self.fall,
+            Action.QUIT: self.quit,
         }
+        self.MOVEMENT_ACTIONS = {Action.RIGHT_SHIFT, Action.LEFT_SHIFT,
+                                 Action.SOFT_DROP, Action.HARD_DROP, Action.CW_ROTATE, Action.CCW_ROTATE}
+
+        self.running = True
 
     def render(self):
         self.screen.fill(self.COLOR_MAP[Color.BLACK])
@@ -127,26 +134,46 @@ class Game:
             pygame.draw.rect(self.screen, color, cell)
 
     def main(self):
-        running = True
-        while running:
+        while self.running:
             self.frame_ticks += 1
             self.lock_down_frame_ticks += 1
 
-            if self.lock_down_active:
-                if self.lock_down_frame_ticks > 0 and self.lock_down_frame_ticks % self.lock_down_frame_rate == 0:
-                    self.lock_down()
+            if self.lock_down_frame_ticks == self.lock_down_frame_rate and self.surface_contact():
+                self.lock_down()
 
+            action_queue = []
             if self.frame_ticks > 0 and self.frame_ticks % self.fall_frame_rate == 0:
-                self.fall()
+                action_queue.append(Action.FALL)
+            action_queue.extend(self.input_manager.poll())
+            for action in action_queue:
+                self.ACTION_TO_CONTROL_MAP[action]()
 
-            for action in self.input_manager.poll():
-                if action == Action.QUIT:
-                    running = False
-                else:
-                    self.ACTION_TO_CONTROL_MAP[action]()
+                if self.surface_contact():
+                    self.switch_on_lock_down()
+                if self.lock_down_active:
+                    if action in self.MOVEMENT_ACTIONS:
+                        self.lock_down_frame_ticks = 0
+
             self.render()
             pygame.display.flip()
             self.clock.tick(self.fps)
+
+    def switch_off_lock_down(self):
+        self.lock_down_active = False
+        self.lock_down_frame_ticks = 0
+
+    def switch_on_lock_down(self):
+        if not self.lock_down_active:
+            self.lock_down_frame_ticks = 0
+        self.lock_down_active = True
+
+    def surface_contact(self):
+        new_position = self.get_active_piece_translation(
+            TranslateDirection.DOWN)
+        return self.matrix.check_collision(new_position)
+
+    def quit(self):
+        self.running = False
 
     def get_active_piece_translation(self, direction: TranslateDirection) -> list[tuple[int, int]]:
         match direction:
@@ -160,15 +187,9 @@ class Game:
     def fall(self):
         new_position = self.get_active_piece_translation(
             TranslateDirection.DOWN)
-
-        # landed on a surface, begin lock down
         if self.matrix.check_collision(new_position):
-            self.lock_down_active = True
-            self.lock_down_frame_ticks = 0
-        else:
-            if self.lock_down_active:
-                self.lock_down_frame_ticks = 0
-            self.active_piece.position = new_position
+            return
+        self.active_piece.position = new_position
 
     def pull_active_piece_from_queue(self):
         self.active_piece = ActivePiece(self.piece_queue.popleft())
@@ -176,13 +197,17 @@ class Game:
         if not self.piece_bag:
             self.piece_bag = deque(generate_random_bag())
 
+    def reset(self):
+        ...
+
     def lock_down(self):
+        assert self.surface_contact(), "lock_down must only be called on surface contact"
+
         for i, j in self.active_piece.position:
             self.matrix[i][j] = self.active_piece.color
+        self.hold_disabled = False
+        self.switch_off_lock_down()
 
-        self.lock_down_active = False
-        self.lock_down_frame_ticks = 0
-        self.save_disabled = False
         self.pull_active_piece_from_queue()
 
     def hard_drop(self):
@@ -207,18 +232,18 @@ class Game:
             return
         self.active_piece.position = new_position
 
-    def save_piece(self):
-        if self.save_disabled:
+    def hold_piece(self):
+        if self.hold_disabled:
             return
 
-        if self.saved_piece is None:
-            self.saved_piece = self.active_piece.piece_type
+        if self.held_piece is None:
+            self.held_piece = self.active_piece.piece_type
             self.pull_active_piece_from_queue()
         else:
             active_piece_type = self.active_piece.piece_type
-            self.active_piece = ActivePiece(self.saved_piece)
-            self.saved_piece = active_piece_type
-        self.save_disabled = True
+            self.active_piece = ActivePiece(self.held_piece)
+            self.held_piece = active_piece_type
+        self.hold_disabled = True
 
     def cw_rotate(self):
         match self.active_piece.piece_type:
@@ -237,11 +262,6 @@ class Game:
                 rotate_t_piece(self.matrix, self.active_piece, Rotation.CCW)
             case PieceType.L_PIECE:
                 rotate_l_piece(self.matrix, self.active_piece, Rotation.CCW)
-
-    def rotate_piece(self):
-        ...
-
-    def quit(self): ...
 
 
 if __name__ == "__main__":

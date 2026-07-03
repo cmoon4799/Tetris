@@ -51,6 +51,7 @@ class ActivePiece:
         self.color: Color = PIECE_TO_COLOR_MAP[self.piece_type]
 
         self.load_starting_position()
+        self.lowest_row = self.min_row
 
     def load_starting_position(self):
         match self.piece_type:
@@ -169,6 +170,7 @@ def rotate_i_piece_visual(piece: ActivePiece, rotation: Rotation) -> list[tuple[
 
 def rotate_i_piece_right_wall_kick(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
     new_orientation = rotate_orientation(piece.orientation, rotation)
+    kick_i, kick_j = (0, 0)
     if rotation == Rotation.CW:
         match new_orientation:
             case PieceOrientation.NORTH:
@@ -196,6 +198,7 @@ def rotate_i_piece_right_wall_kick(piece: ActivePiece, rotation: Rotation) -> li
 
 def rotate_i_piece_left_wall_kick(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
     new_orientation = rotate_orientation(piece.orientation, rotation)
+    kick_i, kick_j = (0, 0)
     if rotation == Rotation.CW:
         match new_orientation:
             case PieceOrientation.NORTH:
@@ -223,6 +226,7 @@ def rotate_i_piece_left_wall_kick(piece: ActivePiece, rotation: Rotation) -> lis
 
 def rotate_i_piece_floor_kick(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
     new_orientation = rotate_orientation(piece.orientation, rotation)
+    kick_i, kick_j = (0, 0)
     if rotation == Rotation.CW:
         match new_orientation:
             case PieceOrientation.NORTH:
@@ -250,6 +254,7 @@ def rotate_i_piece_floor_kick(piece: ActivePiece, rotation: Rotation) -> list[tu
 
 def rotate_i_piece_right_well_kick(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
     new_orientation = rotate_orientation(piece.orientation, rotation)
+    kick_i, kick_j = (0, 0)
     if rotation == Rotation.CW:
         match new_orientation:
             case PieceOrientation.NORTH:
@@ -267,6 +272,7 @@ def rotate_i_piece_right_well_kick(piece: ActivePiece, rotation: Rotation) -> li
 
 def rotate_i_piece_left_well_kick(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
     new_orientation = rotate_orientation(piece.orientation, rotation)
+    kick_i, kick_j = (0, 0)
     if rotation == Rotation.CCW:
         match new_orientation:
             case PieceOrientation.NORTH:
