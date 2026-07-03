@@ -828,3 +828,138 @@ def rotate_s_piece_left_well_kick(piece: ActivePiece, rotation: Rotation) -> lis
 
     new_position = rotate_s_piece_visual(piece, rotation)
     return [(i + kick_i, j + kick_j) for (i, j) in new_position]
+
+
+def rotate_z_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation):
+    new_positions = [
+        rotate_z_piece_visual(piece, rotation),
+        rotate_z_piece_right_wall_kick(piece, rotation),
+        rotate_z_piece_left_wall_kick(piece, rotation),
+        rotate_z_piece_floor_kick(piece, rotation),
+        rotate_z_piece_left_well_kick(piece, rotation),
+        rotate_z_piece_right_well_kick(piece, rotation),
+    ]
+
+    new_orientation = rotate_orientation(piece.orientation, rotation)
+    for position in new_positions:
+        if not matrix.check_collision(position):
+            piece.orientation = new_orientation
+            piece.position = position
+            return
+
+
+def rotate_z_piece_visual(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
+    anchor_row, anchor_col = piece.anchor
+    rotated_orientation = rotate_orientation(piece.orientation, rotation)
+
+    match rotated_orientation:
+        case PieceOrientation.NORTH:
+            new_position = [
+                (anchor_row, anchor_col),
+                (anchor_row, anchor_col + 1),
+                (anchor_row - 1, anchor_col + 1),
+                (anchor_row - 1, anchor_col + 2),
+            ]
+        case PieceOrientation.EAST:
+            new_position = [
+                (anchor_row, anchor_col + 2),
+                (anchor_row - 1, anchor_col + 1),
+                (anchor_row - 1, anchor_col + 2),
+                (anchor_row - 2, anchor_col + 1),
+            ]
+        case PieceOrientation.SOUTH:
+            new_position = [
+                (anchor_row - 1, anchor_col),
+                (anchor_row - 1, anchor_col + 1),
+                (anchor_row - 2, anchor_col + 1),
+                (anchor_row - 2, anchor_col + 2),
+            ]
+        case PieceOrientation.WEST:
+            new_position = [
+                (anchor_row, anchor_col + 1),
+                (anchor_row - 1, anchor_col),
+                (anchor_row - 1, anchor_col + 1),
+                (anchor_row - 2, anchor_col),
+            ]
+
+    return new_position
+
+
+def rotate_z_piece_right_wall_kick(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
+    new_orientation = rotate_orientation(piece.orientation, rotation)
+    kick_i, kick_j = (0, 0)
+    if rotation == Rotation.CW:
+        match new_orientation:
+            case PieceOrientation.NORTH:
+                kick_i, kick_j = (0, -1)
+    else:
+        match new_orientation:
+            case PieceOrientation.SOUTH:
+                kick_i, kick_j = (0, -1)
+
+    new_position = rotate_z_piece_visual(piece, rotation)
+    return [(i + kick_i, j + kick_j) for (i, j) in new_position]
+
+
+def rotate_z_piece_left_wall_kick(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
+    new_orientation = rotate_orientation(piece.orientation, rotation)
+    kick_i, kick_j = (0, 0)
+    if rotation == Rotation.CW:
+        match new_orientation:
+            case PieceOrientation.SOUTH:
+                kick_i, kick_j = (0, 1)
+    else:
+        match new_orientation:
+            case PieceOrientation.NORTH:
+                kick_i, kick_j = (0, 1)
+
+    new_position = rotate_z_piece_visual(piece, rotation)
+    return [(i + kick_i, j + kick_j) for (i, j) in new_position]
+
+
+def rotate_z_piece_floor_kick(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
+    new_orientation = rotate_orientation(piece.orientation, rotation)
+    kick_i, kick_j = (0, 0)
+    if rotation == Rotation.CW:
+        match new_orientation:
+            case PieceOrientation.EAST:
+                kick_i, kick_j = (1, -1)
+    else:
+        match new_orientation:
+            case PieceOrientation.WEST:
+                kick_i, kick_j = (1, 1)
+
+    new_position = rotate_z_piece_visual(piece, rotation)
+    return [(i + kick_i, j + kick_j) for (i, j) in new_position]
+
+
+def rotate_z_piece_right_well_kick(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
+    new_orientation = rotate_orientation(piece.orientation, rotation)
+    kick_i, kick_j = (0, 0)
+    if rotation == Rotation.CW:
+        match new_orientation:
+            case PieceOrientation.NORTH:
+                kick_i, kick_j = (2, -1)
+    else:
+        match new_orientation:
+            case PieceOrientation.NORTH:
+                kick_i, kick_j = (2, 0)
+
+    new_position = rotate_z_piece_visual(piece, rotation)
+    return [(i + kick_i, j + kick_j) for (i, j) in new_position]
+
+
+def rotate_z_piece_left_well_kick(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
+    new_orientation = rotate_orientation(piece.orientation, rotation)
+    kick_i, kick_j = (0, 0)
+    if rotation == Rotation.CW:
+        match new_orientation:
+            case PieceOrientation.NORTH:
+                kick_i, kick_j = (2, 0)
+    else:
+        match new_orientation:
+            case PieceOrientation.NORTH:
+                kick_i, kick_j = (2, 1)
+
+    new_position = rotate_z_piece_visual(piece, rotation)
+    return [(i + kick_i, j + kick_j) for (i, j) in new_position]

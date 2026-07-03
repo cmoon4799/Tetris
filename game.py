@@ -19,6 +19,7 @@ from piece import (
     rotate_l_piece,
     rotate_s_piece,
     rotate_t_piece,
+    rotate_z_piece,
 )
 from shared import Action, Color
 
@@ -269,6 +270,8 @@ class Game:
                 rotate_j_piece(self.matrix, self.active_piece, Rotation.CW)
             case PieceType.S_PIECE:
                 rotate_s_piece(self.matrix, self.active_piece, Rotation.CW)
+            case PieceType.Z_PIECE:
+                rotate_z_piece(self.matrix, self.active_piece, Rotation.CW)
 
     def ccw_rotate(self):
         match self.active_piece.piece_type:
@@ -282,6 +285,8 @@ class Game:
                 rotate_j_piece(self.matrix, self.active_piece, Rotation.CCW)
             case PieceType.S_PIECE:
                 rotate_s_piece(self.matrix, self.active_piece, Rotation.CCW)
+            case PieceType.Z_PIECE:
+                rotate_z_piece(self.matrix, self.active_piece, Rotation.CCW)
 
 
 if __name__ == "__main__":
