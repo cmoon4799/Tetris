@@ -2,13 +2,13 @@ from enum import Enum, auto
 
 
 class Action(Enum):
+    CW_ROTATE = auto()
+    CCW_ROTATE = auto()
     RIGHT_SHIFT = auto()
     LEFT_SHIFT = auto()
     SOFT_DROP = auto()
     HARD_DROP = auto()
     SAVE = auto()
-    CW_ROTATE = auto()
-    CCW_ROTATE = auto()
     GRAVITY = auto()
     QUIT = auto()
 
