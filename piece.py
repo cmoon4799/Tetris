@@ -1,6 +1,7 @@
 from enum import Enum, auto
 from random import shuffle
-from protocol import Color
+from matrix import Matrix
+from shared import Color
 
 
 class PieceType(Enum):
@@ -41,73 +42,209 @@ def generate_random_bag() -> list[PieceType]:
     shuffle(bag)
     return bag
 
-def get_anchor_point(piece_type: PieceType, orientation: PieceOrientation) -> tuple[int, int]:
-    match piece_type:
-        case PieceType.I_PIECE:
-            ...
 
-def get_i_piece_anchor_point(position: list[tuple[int, int]], orientation: PieceOrientation) -> tuple[int, int]:
-    min_i = min(i for i, j in position)
-    max_i = max(i for i, j in position)
-    min_j = min(j for i, j in position)
-    max_j = max(j for i, j in position)
-    match orientation:
+class ActivePiece:
+    def __init__(self, piece_type: PieceType):
+        self.piece_type: PieceType = piece_type
+        self.orientation: PieceOrientation = PieceOrientation.NORTH
+        self.position: list[tuple[int, int]] = []
+        self.color: Color = PIECE_TO_COLOR_MAP[self.piece_type]
+
+        self.load_starting_position()
+
+    def load_starting_position(self):
+        match self.piece_type:
+            case PieceType.I_PIECE:
+                self.position = [(20, 3), (20, 4), (20, 5), (20, 6)]
+            case PieceType.O_PIECE:
+                self.position = [(20, 4), (20, 5), (21, 4), (21, 5)]
+            case PieceType.T_PIECE:
+                self.position = [(20, 3), (20, 4), (20, 5), (21, 4)]
+            case PieceType.L_PIECE:
+                self.position = [(20, 3), (20, 4), (20, 5), (21, 3)]
+            case PieceType.J_PIECE:
+                self.position = [(20, 3), (20, 4), (20, 5), (21, 5)]
+            case PieceType.S_PIECE:
+                self.position = [(20, 3), (20, 4), (21, 4), (21, 5)]
+            case PieceType.Z_PIECE:
+                self.position = [(21, 3), (21, 4), (20, 4), (20, 5)]
+
+    @property
+    def anchor(self):
+        """Each piece, according to its orientation, lies in a fixed position within a square that frames it.
+        Anchor returns the top-left corner of the framing square.
+        """
+
+        match self.piece_type:
+            case PieceType.I_PIECE:
+                return self._get_i_piece_anchor_point()
+            case PieceType.O_PIECE:
+                return self._get_o_piece_anchor_point()
+            case _:
+                return self._get_three_by_two_piece_anchor_point()
+
+    @property
+    def min_row(self):
+        return min(i for (i, j) in self.position)
+
+    @property
+    def max_row(self):
+        return max(i for (i, j) in self.position)
+
+    @property
+    def min_col(self):
+        return min(j for (i, j) in self.position)
+
+    @property
+    def max_col(self):
+        return max(j for (i, j) in self.position)
+
+    def _get_i_piece_anchor_point(self) -> tuple[int, int]:
+        match self.orientation:
+            case PieceOrientation.NORTH:
+                return (self.max_row + 1, self.min_col)
+            case PieceOrientation.EAST:
+                return (self.max_row, self.min_col - 2)
+            case PieceOrientation.SOUTH:
+                return (self.max_row + 2, self.min_col)
+            case PieceOrientation.WEST:
+                return (self.max_row, self.min_col - 1)
+
+    def _get_o_piece_anchor_point(self) -> tuple[int, int]:
+        return (self.max_row, self.min_col - 1)
+
+    def _get_three_by_two_piece_anchor_point(self) -> tuple[int, int]:
+        match self.orientation:
+            case PieceOrientation.NORTH:
+                return (self.max_row, self.min_col)
+            case PieceOrientation.EAST:
+                return (self.max_row, self.min_col - 1)
+            case PieceOrientation.SOUTH:
+                return (self.max_row + 1, self.min_col)
+            case PieceOrientation.WEST:
+                return (self.max_row, self.min_col)
+
+
+def rotate_orientation(orientation: PieceOrientation, rotation: Rotation) -> PieceOrientation:
+    if rotation == Rotation.CW:
+        return list(PieceOrientation)[orientation.value % 4]
+    else:
+        return list(PieceOrientation)[orientation.value - 2 % 4]
+
+
+def rotate_i_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation):
+    new_positions = [
+        rotate_i_piece_visual(piece, rotation),
+        rotate_i_piece_right_wall_kick(piece, rotation),
+        rotate_i_piece_left_wall_kick(piece, rotation),
+        rotate_i_piece_floor_kick(piece, rotation),
+    ]
+
+    new_orientation = rotate_orientation(piece.orientation, rotation)
+    for position in new_positions:
+        if not matrix.check_collision(position):
+            piece.orientation = new_orientation
+            piece.position = position
+            return
+
+
+def rotate_i_piece_visual(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
+    anchor_row, anchor_col = piece.anchor
+    rotated_orientation = rotate_orientation(piece.orientation, rotation)
+
+    match rotated_orientation:
         case PieceOrientation.NORTH:
-            return (min_i + 1, min_j)
+            new_position = [(anchor_row - 1, anchor_col + i) for i in range(4)]
         case PieceOrientation.EAST:
-            return (max_i, min_j - 2)
+            new_position = [(anchor_row - i, anchor_col + 2) for i in range(4)]
         case PieceOrientation.SOUTH:
-            return (1, 2)
+            new_position = [(anchor_row - 2, anchor_col + i) for i in range(4)]
         case PieceOrientation.WEST:
-            return (0, 1)
+            new_position = [(anchor_row - i, anchor_col + 1) for i in range(4)]
+
+    return new_position
 
 
-def rotate_i_piece(matrix: list[list[int]], orientation: PieceOrientation, rotation: Rotation):
-    ...
+def rotate_i_piece_right_wall_kick(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
+    new_orientation = rotate_orientation(piece.orientation, rotation)
+    if rotation == Rotation.CW:
+        match new_orientation:
+            case PieceOrientation.NORTH:
+                kick_i, kick_j = (0, -2)
+            case PieceOrientation.EAST:
+                kick_i, kick_j = (0, 0)
+            case PieceOrientation.SOUTH:
+                kick_i, kick_j = (0, -1)
+            case PieceOrientation.WEST:
+                kick_i, kick_j = (0, 0)
+
+    new_position = rotate_i_piece_visual(piece, rotation)
+    return [(i + kick_i, j + kick_j) for (i, j) in new_position]
 
 
-def rotate_i_piece_visual(matrix: list[list[int]], orientation: PieceOrientation, rotation: Rotation):
-    if orientation == PieceOrientation.NORTH:
-        if rotation == Rotation.CW:
-            return [[0, 0, 1, 0],
-                    [0, 0, 1, 0],
-                    [0, 0, 1, 0],
-                    [0, 0, 1, 0]], PieceOrientation.EAST
-        else:  # CCW
-            return [[0, 0, 1, 0],
-                    [0, 0, 1, 0],
-                    [0, 0, 1, 0],
-                    [0, 0, 1, 0]], PieceOrientation.WEST
-    elif orientation == PieceOrientation.EAST:
-        if rotation == Rotation.CW:
-            return [[1, 1, 1, 1],
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0]], PieceOrientation.SOUTH
-        else:  # CCW
-            return [[1, 1, 1, 1],
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0]], PieceOrientation.NORTH
-    elif orientation == PieceOrientation.SOUTH:
-        if rotation == Rotation.CW:
-            return [[1], 
-                    [1], 
-                    [1], 
-                    [1]], PieceOrientation.WEST
-        else: # CCW
-            return [[1], 
-                    [1], 
-                    [1], 
-                    [1]], PieceOrientation.EAST
-    elif orientation == PieceOrientation.WEST:
-        if rotation == Rotation.CW:
-            return [[1], 
-                    [1], 
-                    [1], 
-                    [1]], PieceOrientation.NORTH
-        else: # CCW
-            return [[1], 
-                    [1], 
-                    [1], 
-                    [1]], PieceOrientation.SOUTH
+def rotate_i_piece_left_wall_kick(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
+    new_orientation = rotate_orientation(piece.orientation, rotation)
+    if rotation == Rotation.CW:
+        match new_orientation:
+            case PieceOrientation.NORTH:
+                kick_i, kick_j = (0, 1)
+            case PieceOrientation.EAST:
+                kick_i, kick_j = (0, 0)
+            case PieceOrientation.SOUTH:
+                kick_i, kick_j = (0, 2)
+            case PieceOrientation.WEST:
+                kick_i, kick_j = (0, 0)
+
+    new_position = rotate_i_piece_visual(piece, rotation)
+    return [(i + kick_i, j + kick_j) for (i, j) in new_position]
+
+
+def rotate_i_piece_floor_kick(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
+    new_orientation = rotate_orientation(piece.orientation, rotation)
+    if rotation == Rotation.CW:
+        match new_orientation:
+            case PieceOrientation.NORTH:
+                kick_i, kick_j = (0, 0)
+            case PieceOrientation.EAST:
+                kick_i, kick_j = (2, 1)
+            case PieceOrientation.SOUTH:
+                kick_i, kick_j = (0, 0)
+            case PieceOrientation.WEST:
+                kick_i, kick_j = (1, 2)
+
+    new_position = rotate_i_piece_visual(piece, rotation)
+    return [(i + kick_i, j + kick_j) for (i, j) in new_position]
+
+
+def rotate_i_piece_right_well_kick(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
+    new_orientation = rotate_orientation(piece.orientation, rotation)
+    if rotation == Rotation.CW:
+        match new_orientation:
+            case PieceOrientation.NORTH:
+                kick_i, kick_j = (1, -2)
+            case PieceOrientation.EAST:
+                kick_i, kick_j = (0, 0)
+            case PieceOrientation.SOUTH:
+                kick_i, kick_j = (2, -1)
+            case PieceOrientation.WEST:
+                kick_i, kick_j = (0, 0)
+
+    new_position = rotate_i_piece_visual(piece, rotation)
+    return [(i + kick_i, j + kick_j) for (i, j) in new_position]
+
+
+def rotate_i_piece_left_well_kick(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
+    new_orientation = rotate_orientation(piece.orientation, rotation)
+    if rotation == Rotation.CW:
+        match new_orientation:
+            case PieceOrientation.NORTH:
+                kick_i, kick_j = (1, 2)
+            case PieceOrientation.EAST:
+                kick_i, kick_j = (0, 0)
+            case PieceOrientation.SOUTH:
+                kick_i, kick_j = (2, 1)
+            case PieceOrientation.WEST:
+                kick_i, kick_j = (0, 0)
+
+    new_position = rotate_i_piece_visual(piece, rotation)
+    return [(i + kick_i, j + kick_j) for (i, j) in new_position]

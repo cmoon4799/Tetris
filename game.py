@@ -3,46 +3,23 @@ Core gameplay orchestration.
 """
 
 
-from piece import PieceType, PieceOrientation, PIECE_TO_COLOR_MAP, generate_random_bag
-from protocol import Action, InputManager, Color
+from input import InputManager
+from piece import ActivePiece, PieceType, generate_random_bag, rotate_i_piece, Rotation
+from shared import Action, Color
 import pygame
 from collections import deque
 from enum import Enum, auto
-
-
-class ActivePiece:
-    def __init__(self, piece_type: PieceType):
-        self.piece_type: PieceType = piece_type
-        self.orientation: PieceOrientation = PieceOrientation.NORTH
-        self.position: list[tuple[int, int]] = []
-        self.color: Color = PIECE_TO_COLOR_MAP[self.piece_type]
-
-        self.load_starting_position()
-
-    def load_starting_position(self):
-        match self.piece_type:
-            case PieceType.I_PIECE:
-                self.position = [(20, 3), (20, 4), (20, 5), (20, 6)]
-            case PieceType.O_PIECE:
-                self.position = [(20, 4), (20, 5), (21, 4), (21, 5)]
-            case PieceType.T_PIECE:
-                self.position = [(20, 3), (20, 4), (20, 5), (21, 4)]
-            case PieceType.L_PIECE:
-                self.position = [(20, 3), (20, 4), (20, 5), (21, 3)]
-            case PieceType.J_PIECE:
-                self.position = [(20, 3), (20, 4), (20, 5), (21, 5)]
-            case PieceType.S_PIECE:
-                self.position = [(20, 3), (20, 4), (21, 4), (21, 5)]
-            case PieceType.Z_PIECE:
-                self.position = [(21, 3), (21, 4), (20, 4), (20, 5)]
+from matrix import Matrix
 
 
 class PygameInputManager(InputManager):
     KEY_TO_ACTION_MAP = {
         pygame.K_RIGHT: Action.RIGHT_SHIFT,
         pygame.K_LEFT: Action.LEFT_SHIFT,
+        pygame.K_UP: Action.CW_ROTATE,
+        pygame.K_LCTRL: Action.CCW_ROTATE,
         pygame.K_SPACE: Action.HARD_DROP,
-        pygame.K_LSHIFT: Action.SAVE_PIECE,
+        pygame.K_LSHIFT: Action.SAVE,
     }
 
     def poll(self) -> list[Action]:
@@ -97,8 +74,8 @@ class Game:
 
         self.active_piece: ActivePiece | None = ActivePiece(PieceType.I_PIECE)
         self.action_queue: list[Action] = []
-        self.matrix: list[list[int]] = [
-            [0 for _ in range(self.MATRIX_WIDTH)] for _ in range(self.MATRIX_HEIGHT)]
+        self.matrix: Matrix = Matrix(
+            matrix_height=self.MATRIX_HEIGHT, matrix_width=self.MATRIX_WIDTH)
 
         pygame.init()
         self.screen = pygame.display.set_mode(
@@ -120,7 +97,9 @@ class Game:
             Action.RIGHT_SHIFT: self.right_shift,
             Action.LEFT_SHIFT: self.left_shift,
             Action.HARD_DROP: self.hard_drop,
-            Action.SAVE_PIECE: self.save_piece,
+            Action.CW_ROTATE: self.cw_rotate,
+            Action.CCW_ROTATE: self.ccw_rotate,
+            Action.SAVE: self.save_piece,
         }
 
     def render(self):
@@ -181,8 +160,9 @@ class Game:
     def fall(self):
         new_position = self.get_active_piece_translation(
             TranslateDirection.DOWN)
+
         # landed on a surface, begin lock down
-        if self.check_collision(new_position):
+        if self.matrix.check_collision(new_position):
             self.lock_down_active = True
             self.lock_down_frame_ticks = 0
         else:
@@ -206,7 +186,7 @@ class Game:
         self.pull_active_piece_from_queue()
 
     def hard_drop(self):
-        while not self.check_collision(self.get_active_piece_translation(TranslateDirection.DOWN)):
+        while not self.matrix.check_collision(self.get_active_piece_translation(TranslateDirection.DOWN)):
             self.active_piece.position = self.get_active_piece_translation(
                 TranslateDirection.DOWN)
         self.lock_down()
@@ -216,30 +196,16 @@ class Game:
     def left_shift(self):
         new_position = self.get_active_piece_translation(
             TranslateDirection.LEFT)
-        if self.check_collision(new_position):
+        if self.matrix.check_collision(new_position):
             return
         self.active_piece.position = new_position
 
     def right_shift(self):
         new_position = self.get_active_piece_translation(
             TranslateDirection.RIGHT)
-        if self.check_collision(new_position):
+        if self.matrix.check_collision(new_position):
             return
         self.active_piece.position = new_position
-
-    def check_collision(self, position: list[tuple[int, int]]):
-        """Check if the provided position collides with existing pieces of the matrix or the walls of the matrix."""
-
-        for i, j in position:
-            if j >= self.MATRIX_WIDTH or j < 0:  # wall collision
-                return True
-            if i < 0:  # floor collision
-                return True
-            # matrix collision
-            if i < self.MATRIX_HEIGHT and self.matrix[i][j]:
-                return True
-
-        return False
 
     def save_piece(self):
         if self.save_disabled:
@@ -253,6 +219,14 @@ class Game:
             self.active_piece = ActivePiece(self.saved_piece)
             self.saved_piece = active_piece_type
         self.save_disabled = True
+
+    def cw_rotate(self):
+        if self.active_piece.piece_type == PieceType.I_PIECE:
+            rotate_i_piece(self.matrix, self.active_piece, Rotation.CW)
+
+    def ccw_rotate(self):
+        if self.active_piece.piece_type == PieceType.I_PIECE:
+            rotate_i_piece(self.matrix, self.active_piece, Rotation.CCW)
 
     def rotate_piece(self):
         ...

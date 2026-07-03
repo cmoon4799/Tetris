@@ -1,7 +1,4 @@
-from abc import abstractmethod
 from enum import Enum, auto
-from collections import deque
-from typing import Protocol
 
 
 class Action(Enum):
@@ -9,19 +6,11 @@ class Action(Enum):
     LEFT_SHIFT = auto()
     SOFT_DROP = auto()
     HARD_DROP = auto()
-    SAVE_PIECE = auto()
-    ROTATE_PIECE = auto()
+    SAVE = auto()
+    CW_ROTATE = auto()
+    CCW_ROTATE = auto()
     GRAVITY = auto()
     QUIT = auto()
-
-
-class InputManager(Protocol):
-    def __init__(self):
-        self.input_queue = deque()
-
-    @abstractmethod
-    def poll(self) -> Action:
-        ...
 
 
 class Color(Enum):
