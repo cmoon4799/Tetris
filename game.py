@@ -4,7 +4,7 @@ Core gameplay orchestration.
 
 
 from input import InputManager
-from piece import ActivePiece, PieceType, generate_random_bag, rotate_i_piece, Rotation
+from piece import ActivePiece, PieceType, generate_random_bag, rotate_i_piece, Rotation, rotate_t_piece
 from shared import Action, Color
 import pygame
 from collections import deque
@@ -72,7 +72,7 @@ class Game:
         self.saved_piece: PieceType | None = None
         self.save_disabled: bool = False
 
-        self.active_piece: ActivePiece | None = ActivePiece(PieceType.I_PIECE)
+        self.active_piece: ActivePiece | None = ActivePiece(PieceType.T_PIECE)
         self.action_queue: list[Action] = []
         self.matrix: Matrix = Matrix(
             matrix_height=self.MATRIX_HEIGHT, matrix_width=self.MATRIX_WIDTH)
@@ -221,12 +221,18 @@ class Game:
         self.save_disabled = True
 
     def cw_rotate(self):
-        if self.active_piece.piece_type == PieceType.I_PIECE:
-            rotate_i_piece(self.matrix, self.active_piece, Rotation.CW)
+        match self.active_piece.piece_type:
+            case PieceType.I_PIECE:
+                rotate_i_piece(self.matrix, self.active_piece, Rotation.CW)
+            case PieceType.T_PIECE:
+                rotate_t_piece(self.matrix, self.active_piece, Rotation.CW)
 
     def ccw_rotate(self):
-        if self.active_piece.piece_type == PieceType.I_PIECE:
-            rotate_i_piece(self.matrix, self.active_piece, Rotation.CCW)
+        match self.active_piece.piece_type:
+            case PieceType.I_PIECE:
+                rotate_i_piece(self.matrix, self.active_piece, Rotation.CCW)
+            case PieceType.T_PIECE:
+                rotate_t_piece(self.matrix, self.active_piece, Rotation.CCW)
 
     def rotate_piece(self):
         ...
