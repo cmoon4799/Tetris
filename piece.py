@@ -757,7 +757,7 @@ def rotate_s_piece_right_wall_kick(piece: ActivePiece, rotation: Rotation) -> li
         match new_orientation:
             case PieceOrientation.NORTH:
                 kick_i, kick_j = (0, -1)
-    else:  # CCW
+    else:
         match new_orientation:
             case PieceOrientation.SOUTH:
                 kick_i, kick_j = (0, -1)
@@ -773,7 +773,7 @@ def rotate_s_piece_left_wall_kick(piece: ActivePiece, rotation: Rotation) -> lis
         match new_orientation:
             case PieceOrientation.SOUTH:
                 kick_i, kick_j = (0, 1)
-    else:  # CCW
+    else:
         match new_orientation:
             case PieceOrientation.NORTH:
                 kick_i, kick_j = (0, 1)
