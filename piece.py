@@ -65,7 +65,7 @@ class ActivePiece:
             case PieceType.L_PIECE:
                 self.position = [(20, 3), (20, 4), (20, 5), (21, 5)]
             case PieceType.J_PIECE:
-                self.position = [(20, 3), (20, 4), (20, 5), (21, 5)]
+                self.position = [(20, 3), (20, 4), (20, 5), (21, 3)]
             case PieceType.S_PIECE:
                 self.position = [(20, 3), (20, 4), (21, 4), (21, 5)]
             case PieceType.Z_PIECE:
@@ -73,8 +73,8 @@ class ActivePiece:
 
     @property
     def anchor(self):
-        """Each piece, according to its orientation, lies in a fixed position within a square that frames it.
-        Anchor returns the top-left corner of the framing square.
+        """Each piece, according to its orientation, lies in a fixed position within a framing
+        square. Returns the top-left corner of the framing square.
         """
 
         match self.piece_type:

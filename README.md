@@ -1,5 +1,7 @@
 Implemented using the 2009 Tetris Design Guideline
 
+Runnable with `python game.py`.
+
 Design Thoughts
 - Action requesters and resolvers should be placed within the Game class as it requires access to Game 
 internals and follow internal Game rules.
@@ -55,3 +57,4 @@ Rules
 - Implement win and lose condition.
 - Implement more efficient clearing of the matrix.
 - Clean up piece generation.
+- Remove engine dependency of the Renderer class for cleaner boundary; instead, rely on Observation dataclass.
