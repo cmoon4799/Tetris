@@ -2,16 +2,25 @@ from enum import Enum, auto
 
 
 class Action(Enum):
-    CW_ROTATE = auto()
-    CCW_ROTATE = auto()
-    RIGHT_SHIFT = auto()
-    LEFT_SHIFT = auto()
-    SOFT_DROP = auto()
-    HARD_DROP = auto()
-    HOLD = auto()
-    GRAVITY = auto()
-    QUIT = auto()
-    FALL = auto()
+    restricted: bool
+
+    def __init__(self, _: int, restricted: bool):
+        self.restricted = restricted
+
+    # -- Player Input Actions --
+    CW_ROTATE = (auto(), False)
+    CCW_ROTATE = (auto(), False)
+    RIGHT_SHIFT = (auto(), False)
+    LEFT_SHIFT = (auto(), False)
+    SOFT_DROP = (auto(), False)
+    HARD_DROP = (auto(), False)
+    HOLD = (auto(), False)
+    GRAVITY = (auto(), False)
+    QUIT = (auto(), False)
+
+    # -- Engine Actions --
+    FALL = (auto(), True)
+    LOCK_DOWN = (auto(), True)
 
 
 class Color(Enum):
@@ -24,3 +33,9 @@ class Color(Enum):
     RED = auto()
     CYAN = auto()
     BLACK = auto()
+    PINK = auto()
+
+
+class RunOutcome(Enum):
+    VICTORY = auto()
+    DEFEAT = auto()

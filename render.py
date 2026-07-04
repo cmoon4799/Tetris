@@ -32,6 +32,7 @@ class Renderer:
         Color.GREEN: (0, 128, 0),
         Color.RED: (255, 0, 0),
         Color.BLACK: (25, 25, 25),
+        Color.PINK: (255, 192, 203),
     }
 
     def __init__(self, engine: Engine):
@@ -48,6 +49,7 @@ class Renderer:
 
         self.render_held_piece()
         self.render_matrix()
+        self.render_active_piece()
         self.render_queue()
 
         pygame.display.flip()
@@ -117,12 +119,16 @@ class Renderer:
                     pygame.draw.rect(self.screen, color, cell)
                 if i < self.MATRIX_HEIGHT:
                     pygame.draw.rect(self.screen, self.COLOR_MAP[Color.CYAN], cell, width=1)
+
+    def render_active_piece(self) -> None:
+        matrix_anchor_x, matrix_anchor_y = (self.FRAMED_PIECE_WIDTH + 2, self.TOP_MARGIN)
         for i, j in self.engine.active_piece.position:
             x = (j + matrix_anchor_x) * self.CELL_SIZE
             y = (self.MATRIX_HEIGHT - 1 - i + matrix_anchor_y) * self.CELL_SIZE
 
             cell = pygame.Rect(x, y, self.CELL_SIZE, self.CELL_SIZE)
-            color = self.COLOR_MAP[self.engine.active_piece.color]
+            # color = self.COLOR_MAP[self.engine.active_piece.color]
+            color = self.COLOR_MAP[Color.PINK]
             pygame.draw.rect(self.screen, color, cell)
 
     def render_queue(self) -> None:

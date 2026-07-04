@@ -308,7 +308,7 @@ def rotate_orientation(orientation: PieceOrientation, rotation: Rotation) -> Pie
         return list(PieceOrientation)[(orientation.value - 2) % 4]
 
 
-def rotate_i_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> None:
+def rotate_i_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> bool:
     new_positions = [
         rotate_i_piece_visual(piece, rotation),
         rotate_i_piece_right_wall_kick(piece, rotation),
@@ -323,7 +323,8 @@ def rotate_i_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> No
         if not matrix.check_collision(position):
             piece.orientation = new_orientation
             piece.position = position
-            return
+            return True
+    return False
 
 
 def rotate_i_piece_visual(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
@@ -463,7 +464,7 @@ def rotate_i_piece_left_well_kick(piece: ActivePiece, rotation: Rotation) -> lis
     return [(i + kick_i, j + kick_j) for (i, j) in new_position]
 
 
-def rotate_t_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> None:
+def rotate_t_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> bool:
     new_positions = [
         rotate_t_piece_visual(piece, rotation),
         rotate_t_piece_right_wall_kick(piece, rotation),
@@ -478,7 +479,8 @@ def rotate_t_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> No
         if not matrix.check_collision(position):
             piece.orientation = new_orientation
             piece.position = position
-            return
+            return True
+    return False
 
 
 def rotate_t_piece_visual(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
@@ -598,7 +600,7 @@ def rotate_t_piece_left_well_kick(piece: ActivePiece, rotation: Rotation) -> lis
     return [(i + kick_i, j + kick_j) for (i, j) in new_position]
 
 
-def rotate_l_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> None:
+def rotate_l_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> bool:
     new_positions = [
         rotate_l_piece_visual(piece, rotation),
         rotate_l_piece_right_wall_kick(piece, rotation),
@@ -613,7 +615,8 @@ def rotate_l_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> No
         if not matrix.check_collision(position):
             piece.orientation = new_orientation
             piece.position = position
-            return
+            return True
+    return False
 
 
 def rotate_l_piece_visual(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
@@ -733,7 +736,7 @@ def rotate_l_piece_left_well_kick(piece: ActivePiece, rotation: Rotation) -> lis
     return [(i + kick_i, j + kick_j) for (i, j) in new_position]
 
 
-def rotate_j_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> None:
+def rotate_j_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> bool:
     new_positions = [
         rotate_j_piece_visual(piece, rotation),
         rotate_j_piece_right_wall_kick(piece, rotation),
@@ -748,7 +751,8 @@ def rotate_j_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> No
         if not matrix.check_collision(position):
             piece.orientation = new_orientation
             piece.position = position
-            return
+            return True
+    return False
 
 
 def rotate_j_piece_visual(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
@@ -868,7 +872,7 @@ def rotate_j_piece_left_well_kick(piece: ActivePiece, rotation: Rotation) -> lis
     return [(i + kick_i, j + kick_j) for (i, j) in new_position]
 
 
-def rotate_s_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> None:
+def rotate_s_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> bool:
     new_positions = [
         rotate_s_piece_visual(piece, rotation),
         rotate_s_piece_right_wall_kick(piece, rotation),
@@ -883,7 +887,8 @@ def rotate_s_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> No
         if not matrix.check_collision(position):
             piece.orientation = new_orientation
             piece.position = position
-            return
+            return True
+    return False
 
 
 def rotate_s_piece_visual(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:
@@ -1003,7 +1008,7 @@ def rotate_s_piece_left_well_kick(piece: ActivePiece, rotation: Rotation) -> lis
     return [(i + kick_i, j + kick_j) for (i, j) in new_position]
 
 
-def rotate_z_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> None:
+def rotate_z_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> bool:
     new_positions = [
         rotate_z_piece_visual(piece, rotation),
         rotate_z_piece_right_wall_kick(piece, rotation),
@@ -1018,7 +1023,8 @@ def rotate_z_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> No
         if not matrix.check_collision(position):
             piece.orientation = new_orientation
             piece.position = position
-            return
+            return True
+    return False
 
 
 def rotate_z_piece_visual(piece: ActivePiece, rotation: Rotation) -> list[tuple[int, int]]:

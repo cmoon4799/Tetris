@@ -3,11 +3,12 @@ from shared import Color
 
 class Matrix:
     def __init__(self, matrix_width: int, matrix_height: int):
-        self.matrix_width = matrix_width
-        self.matrix_height = matrix_height
+        self.matrix_width: int = matrix_width
+        self.matrix_height: int = matrix_height
         self._matrix: list[list[Color]] = [
             [0 for _ in range(matrix_width)] for _ in range(matrix_height + 5)
         ]
+        self.lines_cleared: int = 0
 
     def check_collision(self, position: list[tuple[int, int]]) -> bool:
         """Check if the provided position collides with existing pieces of the matrix or the walls
@@ -32,6 +33,8 @@ class Matrix:
         for row in self._matrix:
             if any(cell == 0 for cell in row):
                 surviving_rows.append(row)
+            else:
+                self.lines_cleared += 1
 
         self._matrix = [*surviving_rows]
         self._matrix += [

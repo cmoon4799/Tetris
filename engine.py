@@ -1,6 +1,7 @@
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum, auto
+from typing import Callable
 
 import pygame
 
@@ -17,7 +18,7 @@ from piece import (
     rotate_t_piece,
     rotate_z_piece,
 )
-from shared import Action
+from shared import Action, RunOutcome
 
 
 class TranslateDirection(Enum):
@@ -29,14 +30,15 @@ class TranslateDirection(Enum):
 @dataclass(frozen=True)
 class ActionResult:
     success: bool
-    new_piece_generated: bool = False
-    game_over: bool = False
+    piece_generated: bool = False
 
 
 class Engine:
     MATRIX_WIDTH = 10
     MATRIX_HEIGHT = 20
-    BUFFER_HEIGHT = 5
+    BUFFER_HEIGHT = 5  # rendered space above the matrix skyline
+
+    LINE_CLEAR_GOAL = 1
 
     def __init__(self):
         # visible queue of pieces; pieces in the queue are replaced with those from the piece_bag
@@ -50,6 +52,7 @@ class Engine:
         self.matrix: Matrix = Matrix(
             matrix_width=self.MATRIX_WIDTH, matrix_height=(self.MATRIX_HEIGHT + self.BUFFER_HEIGHT)
         )
+        self.action_queue = deque()
 
         pygame.init()
 
@@ -65,7 +68,7 @@ class Engine:
         self.lock_down_active = False
         self.lock_down_frame_ticks = 0
 
-        self.ACTION_TO_CONTROL_MAP = {
+        self.ACTION_TO_CONTROL_MAP: dict[Action, Callable[[], ActionResult]] = {
             Action.RIGHT_SHIFT: self.right_shift,
             Action.LEFT_SHIFT: self.left_shift,
             Action.HARD_DROP: self.hard_drop,
@@ -73,8 +76,9 @@ class Engine:
             Action.CW_ROTATE: self.cw_rotate,
             Action.CCW_ROTATE: self.ccw_rotate,
             Action.HOLD: self.hold_piece,
-            Action.FALL: self.fall,
             Action.QUIT: self.quit,
+            Action.FALL: self.fall,
+            Action.LOCK_DOWN: self.lock_down,
         }
         self.MOVEMENT_ACTIONS = {
             Action.RIGHT_SHIFT,
@@ -86,45 +90,81 @@ class Engine:
         }
 
         self.running = True
+        self.run_outcome: RunOutcome | None = None
 
     def process_frame(self, actions: list[Action]) -> None:
+        for action in actions:
+            if not isinstance(action, Action) or action.restricted:
+                raise ValueError(f"Provided input {action} is not a valid player action.")
+
         self.frame_ticks += 1
-        self.lock_down_frame_ticks += 1
+        if self.lock_down_active:
+            self.lock_down_frame_ticks += 1
+
+        self.action_queue.clear()
+        self.action_queue.extend(actions)
 
         if self.lock_down_frame_ticks == self.lock_down_frame_rate and self.surface_contact():
-            self.lock_down()
-        else:
-            if self.frame_ticks > 0 and self.frame_ticks % self.fall_frame_rate == 0:
-                actions = [Action.FALL, *actions]
-            for action in actions:
-                # actions are presumed to be for the current active piece; because lock down
-                # generates a new active piece, we ignore actions by exiting early
-                self.ACTION_TO_CONTROL_MAP[action]()
+            self.action_queue.appendleft(Action.LOCK_DOWN)
+        if self.frame_ticks > 0 and self.frame_ticks % self.fall_frame_rate == 0:
+            self.action_queue.appendleft(Action.FALL)
 
-                if self.surface_contact():
-                    self.switch_on_lock_down()
-                if self.lock_down_active:
-                    if action in self.MOVEMENT_ACTIONS:
-                        self.lock_down_frame_ticks = 0
+        while self.action_queue:
+            action = self.action_queue.popleft()
+            result = self.ACTION_TO_CONTROL_MAP[action]()
 
-            self.matrix.clear()
+            if self.check_defeat_condition(result):
+                break
+            if self.check_win_condition(result):
+                break
+
+            # actions are presumed to be for the current active piece; if a new active piece is
+            # generated, we ignore actions by exiting early
+            if result.piece_generated:
+                break
+
+            if self.surface_contact():
+                self.switch_on_lock_down()
+            else:
+                self.switch_off_lock_down()
+
+            # in Infinite Lock Down, any successful movement action resets the lock down
+            # frame counter
+            if action in self.MOVEMENT_ACTIONS and result.success and self.lock_down_active:
+                self.lock_down_frame_ticks = 0
 
         self.clock.tick(self.fps)
 
     # --- State Management ---
 
     def switch_on_lock_down(self) -> None:
-        """Activate lock-down timer."""
         if not self.lock_down_active:
             self.lock_down_frame_ticks = 0
         self.lock_down_active = True
 
     def switch_off_lock_down(self) -> None:
-        """Deactivate lock-down timer."""
         self.lock_down_active = False
         self.lock_down_frame_ticks = 0
 
     # --- Game Logic ---
+
+    def check_defeat_condition(self, result: ActionResult) -> bool:
+        """Check the defeat condition and returns whether the condition has been met."""
+
+        if result.piece_generated and self.matrix.check_collision(self.active_piece.position):
+            self.run_outcome = RunOutcome.DEFEAT
+            self.running = False
+            return True
+        return False
+
+    def check_win_condition(self, result: ActionResult) -> None:
+        """Check the victory condition and returns whether the condition has been met."""
+
+        if self.matrix.lines_cleared >= self.LINE_CLEAR_GOAL:
+            self.run_outcome = RunOutcome.VICTORY
+            self.running = False
+            return True
+        return False
 
     def pull_active_piece_from_queue(self) -> None:
         self.switch_off_lock_down()
@@ -134,13 +174,9 @@ class Engine:
         if not self.piece_bag:
             self.piece_bag = deque(generate_random_bag())
 
-        # this particular lose condition is known as "Block Out", meaning
-        # the new active piece spawns in a position that collides with
-        # the existing cells of the matrix
-        if self.matrix.check_collision(self.active_piece.position):
-            self.running = False
+    # --- Input Handlers ---
 
-    def lock_down(self) -> None:
+    def lock_down(self) -> ActionResult:
         """Lock down the active piece and pull the next active piece from the queue."""
 
         if not self.surface_contact():
@@ -155,81 +191,83 @@ class Engine:
 
         self.pull_active_piece_from_queue()
 
-    def fall(self) -> None:
+        return ActionResult(True, True)
+
+    def fall(self) -> ActionResult:
         new_position = self.get_active_piece_translation(TranslateDirection.DOWN)
         if not self.matrix.check_collision(new_position):
             self.active_piece.position = new_position
-
-    # --- Input Handlers ---
+            return ActionResult(True)
+        return ActionResult(False)
 
     def left_shift(self) -> ActionResult:
         new_position = self.get_active_piece_translation(TranslateDirection.LEFT)
         if not self.matrix.check_collision(new_position):
             self.active_piece.position = new_position
             return ActionResult(True)
-        else:
-            return ActionResult(False)
+        return ActionResult(False)
 
-    def right_shift(self) -> None:
+    def right_shift(self) -> ActionResult:
         new_position = self.get_active_piece_translation(TranslateDirection.RIGHT)
         if not self.matrix.check_collision(new_position):
             self.active_piece.position = new_position
             return ActionResult(True)
-        else:
-            return ActionResult(False)
+        return ActionResult(False)
 
-    def soft_drop(self) -> None:
+    def soft_drop(self) -> ActionResult:
         new_position = self.get_active_piece_translation(TranslateDirection.DOWN)
         if not self.matrix.check_collision(new_position):
             self.active_piece.position = new_position
             return ActionResult(True)
-        else:
-            return ActionResult(False)
+        return ActionResult(False)
 
-    def hard_drop(self) -> None:
+    def hard_drop(self) -> ActionResult:
         while not self.matrix.check_collision(
             self.get_active_piece_translation(TranslateDirection.DOWN)
         ):
             self.active_piece.position = self.get_active_piece_translation(TranslateDirection.DOWN)
-        self.lock_down()
+        self.action_queue.appendleft(Action.LOCK_DOWN)
+        return ActionResult(True)
 
-    def cw_rotate(self) -> None:
+    def cw_rotate(self) -> ActionResult:
         match self.active_piece.piece_type:
             case PieceType.I_PIECE:
-                rotate_i_piece(self.matrix, self.active_piece, Rotation.CW)
+                success = rotate_i_piece(self.matrix, self.active_piece, Rotation.CW)
             case PieceType.T_PIECE:
-                rotate_t_piece(self.matrix, self.active_piece, Rotation.CW)
+                success = rotate_t_piece(self.matrix, self.active_piece, Rotation.CW)
             case PieceType.L_PIECE:
-                rotate_l_piece(self.matrix, self.active_piece, Rotation.CW)
+                success = rotate_l_piece(self.matrix, self.active_piece, Rotation.CW)
             case PieceType.J_PIECE:
-                rotate_j_piece(self.matrix, self.active_piece, Rotation.CW)
+                success = rotate_j_piece(self.matrix, self.active_piece, Rotation.CW)
             case PieceType.S_PIECE:
-                rotate_s_piece(self.matrix, self.active_piece, Rotation.CW)
+                success = rotate_s_piece(self.matrix, self.active_piece, Rotation.CW)
             case PieceType.Z_PIECE:
-                rotate_z_piece(self.matrix, self.active_piece, Rotation.CW)
+                success = rotate_z_piece(self.matrix, self.active_piece, Rotation.CW)
             case PieceType.O_PIECE:
-                pass  # no rotation for O piece
+                success = False
+        return ActionResult(success)
 
-    def ccw_rotate(self) -> None:
+    def ccw_rotate(self) -> ActionResult:
         match self.active_piece.piece_type:
             case PieceType.I_PIECE:
-                rotate_i_piece(self.matrix, self.active_piece, Rotation.CCW)
+                success = rotate_i_piece(self.matrix, self.active_piece, Rotation.CCW)
             case PieceType.T_PIECE:
-                rotate_t_piece(self.matrix, self.active_piece, Rotation.CCW)
+                success = rotate_t_piece(self.matrix, self.active_piece, Rotation.CCW)
             case PieceType.L_PIECE:
-                rotate_l_piece(self.matrix, self.active_piece, Rotation.CCW)
+                success = rotate_l_piece(self.matrix, self.active_piece, Rotation.CCW)
             case PieceType.J_PIECE:
-                rotate_j_piece(self.matrix, self.active_piece, Rotation.CCW)
+                success = rotate_j_piece(self.matrix, self.active_piece, Rotation.CCW)
             case PieceType.S_PIECE:
-                rotate_s_piece(self.matrix, self.active_piece, Rotation.CCW)
+                success = rotate_s_piece(self.matrix, self.active_piece, Rotation.CCW)
             case PieceType.Z_PIECE:
-                rotate_z_piece(self.matrix, self.active_piece, Rotation.CCW)
+                success = rotate_z_piece(self.matrix, self.active_piece, Rotation.CCW)
             case PieceType.O_PIECE:
-                pass  # no rotation for O piece
+                success = False
+        return ActionResult(success)
 
-    def hold_piece(self) -> None:
+    def hold_piece(self) -> ActionResult:
         if self.hold_disabled:
-            return
+            return ActionResult(False)
 
         if self.held_piece is None:
             self.held_piece = self.active_piece.piece_type
@@ -239,6 +277,8 @@ class Engine:
             self.active_piece = ActivePiece(self.held_piece)
             self.held_piece = active_piece_type
         self.hold_disabled = True
+
+        return ActionResult(True, True)
 
     # --- Utilities ---
 
