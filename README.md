@@ -51,6 +51,7 @@ Rules
     - Wall Kick
         - Well Detection
 
-TODO
-- Color
-    - O (Yellow), I (Blue), T (Purple), L (Orange), J (Dark Blue), S (Green), Z (Red)
+## TODO
+- Implement win and lose condition.
+- Implement more efficient clearing of the matrix.
+- Clean up piece generation.

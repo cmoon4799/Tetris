@@ -9,8 +9,10 @@ class Matrix:
             [0 for _ in range(matrix_width)] for _ in range(matrix_height)
         ]
 
-    def check_collision(self, position: list[tuple[int, int]]):
-        """Check if the provided position collides with existing pieces of the matrix or the walls of the matrix."""
+    def check_collision(self, position: list[tuple[int, int]]) -> bool:
+        """Check if the provided position collides with existing pieces of the matrix or the walls
+        of the matrix.
+        """
 
         for i, j in position:
             # wall collision
@@ -25,7 +27,7 @@ class Matrix:
 
         return False
 
-    def clear(self):
+    def clear(self) -> None:
         surviving_rows = []
         for row in self._matrix:
             if any(cell == 0 for cell in row):
@@ -37,5 +39,7 @@ class Matrix:
             for _ in range(self.matrix_height - len(surviving_rows))
         ]
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index: int) -> list[Color]:
+        if not 0 <= index < self.matrix_height:
+            raise IndexError(f"matrix index {index} out of range [0, {self.matrix_height})")
         return self._matrix[index]

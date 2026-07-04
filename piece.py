@@ -129,7 +129,7 @@ class ActivePiece:
 
 def generate_position_with_anchor(
     piece_type: PieceType, orientation: PieceOrientation, anchor: tuple[int, int]
-):
+) -> list[tuple[int, int]]:
     anchor_row, anchor_col = anchor
     match piece_type:
         case PieceType.I_PIECE:
@@ -308,7 +308,7 @@ def rotate_orientation(orientation: PieceOrientation, rotation: Rotation) -> Pie
         return list(PieceOrientation)[(orientation.value - 2) % 4]
 
 
-def rotate_i_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation):
+def rotate_i_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> None:
     new_positions = [
         rotate_i_piece_visual(piece, rotation),
         rotate_i_piece_right_wall_kick(piece, rotation),
@@ -463,7 +463,7 @@ def rotate_i_piece_left_well_kick(piece: ActivePiece, rotation: Rotation) -> lis
     return [(i + kick_i, j + kick_j) for (i, j) in new_position]
 
 
-def rotate_t_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation):
+def rotate_t_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> None:
     new_positions = [
         rotate_t_piece_visual(piece, rotation),
         rotate_t_piece_right_wall_kick(piece, rotation),
@@ -598,7 +598,7 @@ def rotate_t_piece_left_well_kick(piece: ActivePiece, rotation: Rotation) -> lis
     return [(i + kick_i, j + kick_j) for (i, j) in new_position]
 
 
-def rotate_l_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation):
+def rotate_l_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> None:
     new_positions = [
         rotate_l_piece_visual(piece, rotation),
         rotate_l_piece_right_wall_kick(piece, rotation),
@@ -733,7 +733,7 @@ def rotate_l_piece_left_well_kick(piece: ActivePiece, rotation: Rotation) -> lis
     return [(i + kick_i, j + kick_j) for (i, j) in new_position]
 
 
-def rotate_j_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation):
+def rotate_j_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> None:
     new_positions = [
         rotate_j_piece_visual(piece, rotation),
         rotate_j_piece_right_wall_kick(piece, rotation),
@@ -868,7 +868,7 @@ def rotate_j_piece_left_well_kick(piece: ActivePiece, rotation: Rotation) -> lis
     return [(i + kick_i, j + kick_j) for (i, j) in new_position]
 
 
-def rotate_s_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation):
+def rotate_s_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> None:
     new_positions = [
         rotate_s_piece_visual(piece, rotation),
         rotate_s_piece_right_wall_kick(piece, rotation),
@@ -1003,7 +1003,7 @@ def rotate_s_piece_left_well_kick(piece: ActivePiece, rotation: Rotation) -> lis
     return [(i + kick_i, j + kick_j) for (i, j) in new_position]
 
 
-def rotate_z_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation):
+def rotate_z_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation) -> None:
     new_positions = [
         rotate_z_piece_visual(piece, rotation),
         rotate_z_piece_right_wall_kick(piece, rotation),
