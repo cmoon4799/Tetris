@@ -127,6 +127,180 @@ class ActivePiece:
                 return (self.max_row, self.min_col)
 
 
+def generate_position_with_anchor(
+    piece_type: PieceType, orientation: PieceOrientation, anchor: tuple[int, int]
+):
+    anchor_row, anchor_col = anchor
+    match piece_type:
+        case PieceType.I_PIECE:
+            match orientation:
+                case PieceOrientation.NORTH:
+                    return [(anchor_row - 1, anchor_col + i) for i in range(4)]
+                case PieceOrientation.EAST:
+                    return [(anchor_row - i, anchor_col + 2) for i in range(4)]
+                case PieceOrientation.SOUTH:
+                    return [(anchor_row - 2, anchor_col + i) for i in range(4)]
+                case PieceOrientation.WEST:
+                    return [(anchor_row - i, anchor_col + 1) for i in range(4)]
+        case PieceType.T_PIECE:
+            match orientation:
+                case PieceOrientation.NORTH:
+                    return [
+                        (anchor_row, anchor_col + 1),
+                        (anchor_row - 1, anchor_col),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 2),
+                    ]
+                case PieceOrientation.EAST:
+                    return [
+                        (anchor_row, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 2),
+                        (anchor_row - 2, anchor_col + 1),
+                    ]
+                case PieceOrientation.SOUTH:
+                    return [
+                        (anchor_row - 1, anchor_col),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 2),
+                        (anchor_row - 2, anchor_col + 1),
+                    ]
+                case PieceOrientation.WEST:
+                    return [
+                        (anchor_row, anchor_col + 1),
+                        (anchor_row - 1, anchor_col),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 2, anchor_col + 1),
+                    ]
+        case PieceType.L_PIECE:
+            match orientation:
+                case PieceOrientation.NORTH:
+                    return [
+                        (anchor_row - 1, anchor_col),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 2),
+                        (anchor_row, anchor_col + 2),
+                    ]
+                case PieceOrientation.EAST:
+                    return [
+                        (anchor_row, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 2, anchor_col + 1),
+                        (anchor_row - 2, anchor_col + 2),
+                    ]
+                case PieceOrientation.SOUTH:
+                    return [
+                        (anchor_row - 1, anchor_col),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 2),
+                        (anchor_row - 2, anchor_col),
+                    ]
+                case PieceOrientation.WEST:
+                    return [
+                        (anchor_row, anchor_col),
+                        (anchor_row, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 2, anchor_col + 1),
+                    ]
+        case PieceType.J_PIECE:
+            match orientation:
+                case PieceOrientation.NORTH:
+                    return [
+                        (anchor_row, anchor_col),
+                        (anchor_row - 1, anchor_col),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 2),
+                    ]
+                case PieceOrientation.EAST:
+                    return [
+                        (anchor_row, anchor_col + 2),
+                        (anchor_row, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 2, anchor_col + 1),
+                    ]
+                case PieceOrientation.SOUTH:
+                    return [
+                        (anchor_row - 1, anchor_col),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 2),
+                        (anchor_row - 2, anchor_col + 2),
+                    ]
+                case PieceOrientation.WEST:
+                    return [
+                        (anchor_row, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 2, anchor_col),
+                        (anchor_row - 2, anchor_col + 1),
+                    ]
+        case PieceType.S_PIECE:
+            match orientation:
+                case PieceOrientation.NORTH:
+                    return [
+                        (anchor_row, anchor_col + 1),
+                        (anchor_row, anchor_col + 2),
+                        (anchor_row - 1, anchor_col),
+                        (anchor_row - 1, anchor_col + 1),
+                    ]
+                case PieceOrientation.EAST:
+                    return [
+                        (anchor_row, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 2),
+                        (anchor_row - 2, anchor_col + 2),
+                    ]
+                case PieceOrientation.SOUTH:
+                    return [
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 2),
+                        (anchor_row - 2, anchor_col),
+                        (anchor_row - 2, anchor_col + 1),
+                    ]
+                case PieceOrientation.WEST:
+                    return [
+                        (anchor_row, anchor_col),
+                        (anchor_row - 1, anchor_col),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 2, anchor_col + 1),
+                    ]
+        case PieceType.Z_PIECE:
+            match orientation:
+                case PieceOrientation.NORTH:
+                    return [
+                        (anchor_row, anchor_col),
+                        (anchor_row, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 2),
+                    ]
+                case PieceOrientation.EAST:
+                    return [
+                        (anchor_row, anchor_col + 2),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 1, anchor_col + 2),
+                        (anchor_row - 2, anchor_col + 1),
+                    ]
+                case PieceOrientation.SOUTH:
+                    return [
+                        (anchor_row - 1, anchor_col),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 2, anchor_col + 1),
+                        (anchor_row - 2, anchor_col + 2),
+                    ]
+                case PieceOrientation.WEST:
+                    return [
+                        (anchor_row, anchor_col + 1),
+                        (anchor_row - 1, anchor_col),
+                        (anchor_row - 1, anchor_col + 1),
+                        (anchor_row - 2, anchor_col),
+                    ]
+        case PieceType.O_PIECE:
+            return [
+                (anchor_row - 1, anchor_col + 1),
+                (anchor_row - 1, anchor_col + 2),
+                (anchor_row, anchor_col + 1),
+                (anchor_row, anchor_col + 2),
+            ]
+
+
 def rotate_orientation(orientation: PieceOrientation, rotation: Rotation) -> PieceOrientation:
     if rotation == Rotation.CW:
         return list(PieceOrientation)[orientation.value % 4]
@@ -437,7 +611,6 @@ def rotate_l_piece(matrix: Matrix, piece: ActivePiece, rotation: Rotation):
     new_orientation = rotate_orientation(piece.orientation, rotation)
     for position in new_positions:
         if not matrix.check_collision(position):
-            print(piece.orientation.name, new_orientation.name)
             piece.orientation = new_orientation
             piece.position = position
             return

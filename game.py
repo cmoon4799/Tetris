@@ -10,9 +10,12 @@ import pygame
 from input import InputManager
 from matrix import Matrix
 from piece import (
+    PIECE_TO_COLOR_MAP,
     ActivePiece,
+    PieceOrientation,
     PieceType,
     Rotation,
+    generate_position_with_anchor,
     generate_random_bag,
     rotate_i_piece,
     rotate_j_piece,
@@ -29,6 +32,7 @@ class PygameInputManager(InputManager):
         pygame.K_RIGHT: Action.RIGHT_SHIFT,
         pygame.K_LEFT: Action.LEFT_SHIFT,
         pygame.K_UP: Action.CW_ROTATE,
+        pygame.K_DOWN: Action.SOFT_DROP,
         pygame.K_LCTRL: Action.CCW_ROTATE,
         pygame.K_SPACE: Action.HARD_DROP,
         pygame.K_LSHIFT: Action.HOLD,
@@ -42,7 +46,6 @@ class PygameInputManager(InputManager):
                 if event.key in self.KEY_TO_ACTION_MAP:
                     actions.append(self.KEY_TO_ACTION_MAP[event.key])
             if event.type == pygame.QUIT:
-                print("appending quit")
                 actions.append(Action.QUIT)
 
         return actions
@@ -60,11 +63,16 @@ class Game:
     internals and follow internal Game rules.
     """
 
-    MATRIX_WIDTH = 10
-    MATRIX_HEIGHT = 20
     CELL_SIZE = 30
-    WINDOW_WIDTH = (MATRIX_WIDTH + 2) * CELL_SIZE
-    WINDOW_HEIGHT = (MATRIX_HEIGHT + 4) * CELL_SIZE
+
+    MATRIX_WIDTH = 10  # in unit of CELL_SIZE
+    MATRIX_HEIGHT = 20  # in unit of CELL_SIZE
+    TOP_MARGIN = 3  # in unit of CELL_SIZE
+    FRAMED_PIECE_WIDTH = 5  # in unit of CELL_SIZE
+    FRAMED_PIECE_HEIGHT = 3  # in unit of CELL_SIZE
+
+    VISIBLE_QUEUE_SIZE = 6  # number of visible pieces in the queue
+
     COLOR_MAP = {
         Color.YELLOW: (255, 255, 0),
         Color.CYAN: (0, 255, 255),
@@ -85,14 +93,20 @@ class Game:
         self.held_piece: PieceType | None = None
         self.hold_disabled: bool = False
 
-        self.active_piece: ActivePiece | None = ActivePiece(PieceType.S_PIECE)
+        self.active_piece: ActivePiece | None = ActivePiece(PieceType.I_PIECE)
         self.action_queue: list[Action] = []
         self.matrix: Matrix = Matrix(
-            matrix_height=self.MATRIX_HEIGHT, matrix_width=self.MATRIX_WIDTH
+            matrix_width=self.MATRIX_WIDTH, matrix_height=self.MATRIX_HEIGHT
         )
 
         pygame.init()
-        self.screen = pygame.display.set_mode((self.WINDOW_WIDTH, self.WINDOW_HEIGHT))
+
+        # calculate window width; A, B, C are the held piece, matrix, and queue respectively
+        # * - A -- * - B -- * - C --
+        window_width = (self.MATRIX_WIDTH + 5 + 5 + 4) * self.CELL_SIZE
+        window_height = (self.MATRIX_HEIGHT + 1 + self.TOP_MARGIN) * self.CELL_SIZE
+
+        self.screen = pygame.display.set_mode((window_width, window_height))
         self.clock = pygame.time.Clock()
         self.fps = 60  # frames per second
         self.frame_ticks = 0
@@ -110,6 +124,7 @@ class Game:
             Action.RIGHT_SHIFT: self.right_shift,
             Action.LEFT_SHIFT: self.left_shift,
             Action.HARD_DROP: self.hard_drop,
+            Action.SOFT_DROP: self.soft_drop,
             Action.CW_ROTATE: self.cw_rotate,
             Action.CCW_ROTATE: self.ccw_rotate,
             Action.HOLD: self.hold_piece,
@@ -130,25 +145,90 @@ class Game:
     def render(self):
         self.screen.fill(self.COLOR_MAP[Color.BLACK])
 
+        self.render_framed_piece(
+            piece_type=self.held_piece,
+            offset=(self.CELL_SIZE, self.TOP_MARGIN * self.CELL_SIZE),
+            draw_border=True,
+        )
+
+        self.render_queue()
+
+        matrix_anchor_x, matrix_anchor_y = (self.FRAMED_PIECE_WIDTH + 2, self.TOP_MARGIN)
         for i in range(self.MATRIX_HEIGHT):
             for j in range(self.MATRIX_WIDTH):
-                x = (j + 1) * self.CELL_SIZE
-                y = (i + 2) * self.CELL_SIZE
+                x = (j + matrix_anchor_x) * self.CELL_SIZE
+                y = (self.MATRIX_HEIGHT - 1 - i + matrix_anchor_y) * self.CELL_SIZE
 
                 cell = pygame.Rect(x, y, self.CELL_SIZE, self.CELL_SIZE)
-
-                if self.matrix[self.MATRIX_HEIGHT - 1 - i][j]:
-                    color = self.COLOR_MAP[self.matrix[self.MATRIX_HEIGHT - 1 - i][j]]
+                if self.matrix[i][j]:
+                    color = self.COLOR_MAP[self.matrix[i][j]]
                     pygame.draw.rect(self.screen, color, cell)
                 pygame.draw.rect(self.screen, self.COLOR_MAP[Color.CYAN], cell, width=1)
-
         for i, j in self.active_piece.position:
-            x = (j + 1) * self.CELL_SIZE
-            y = (self.MATRIX_HEIGHT + 1 - i) * self.CELL_SIZE
+            x = (j + matrix_anchor_x) * self.CELL_SIZE
+            y = (self.MATRIX_HEIGHT - 1 - i + matrix_anchor_y) * self.CELL_SIZE
 
             cell = pygame.Rect(x, y, self.CELL_SIZE, self.CELL_SIZE)
             color = self.COLOR_MAP[self.active_piece.color]
             pygame.draw.rect(self.screen, color, cell)
+
+    def render_framed_piece(
+        self, piece_type: PieceType | None, offset: tuple[int, int], draw_border: bool
+    ):
+        """Render the 5 by 3 framing rectangle, along with its framed piece. Without any offset,
+        these cells will be drawn in the top left corner of the pygame screen.
+        """
+
+        offset_x, offset_y = offset
+        if draw_border:
+            held_piece_rectangle = pygame.Rect(
+                offset_x,
+                offset_y,
+                self.CELL_SIZE * self.FRAMED_PIECE_WIDTH,
+                self.CELL_SIZE * self.FRAMED_PIECE_HEIGHT,
+            )
+            pygame.draw.rect(self.screen, self.COLOR_MAP[Color.CYAN], held_piece_rectangle, width=1)
+
+        if piece_type is None:
+            return
+
+        position = generate_position_with_anchor(
+            piece_type=piece_type,
+            orientation=PieceOrientation.NORTH,
+            anchor=(0, 0),
+        )
+        color = self.COLOR_MAP[PIECE_TO_COLOR_MAP[piece_type]]
+        match piece_type:
+            case PieceType.I_PIECE:
+                top_margin = 1
+                left_margin = 0.5
+            case PieceType.O_PIECE:
+                top_margin = 1.5
+                left_margin = 0.5
+            case _:
+                top_margin = 1.5
+                left_margin = 1
+        for i, j in position:
+            x = (j + left_margin) * self.CELL_SIZE
+            y = (-1 - i + top_margin) * self.CELL_SIZE
+            cell = pygame.Rect(x + offset_x, y + offset_y, self.CELL_SIZE, self.CELL_SIZE)
+            pygame.draw.rect(self.screen, color, cell)
+
+    def render_queue(self):
+        offset_x = (3 + self.FRAMED_PIECE_WIDTH + self.MATRIX_WIDTH) * self.CELL_SIZE
+        offset_y = self.TOP_MARGIN * self.CELL_SIZE
+        queue_height = self.FRAMED_PIECE_HEIGHT * self.CELL_SIZE * self.VISIBLE_QUEUE_SIZE
+        queue_width = self.FRAMED_PIECE_WIDTH * self.CELL_SIZE
+        queue_rectangle = pygame.Rect(offset_x, offset_y, queue_width, queue_height)
+
+        pygame.draw.rect(self.screen, self.COLOR_MAP[Color.CYAN], queue_rectangle, width=1)
+
+        for i in range(self.VISIBLE_QUEUE_SIZE):
+            self.render_framed_piece(
+                piece_type=self.piece_queue[i],
+                offset=(offset_x, offset_y + self.FRAMED_PIECE_HEIGHT * self.CELL_SIZE * i),
+                draw_border=False,
+            )
 
     def main(self):
         while self.running:
@@ -202,17 +282,14 @@ class Game:
 
     def fall(self):
         new_position = self.get_active_piece_translation(TranslateDirection.DOWN)
-        if self.matrix.check_collision(new_position):
-            return
-        self.active_piece.position = new_position
+        if not self.matrix.check_collision(new_position):
+            self.active_piece.position = new_position
 
     def pull_active_piece_from_queue(self):
         self.active_piece = ActivePiece(self.piece_queue.popleft())
         self.piece_queue.append(self.piece_bag.popleft())
         if not self.piece_bag:
             self.piece_bag = deque(generate_random_bag())
-
-    def reset(self): ...
 
     def lock_down(self):
         assert self.surface_contact(), "lock_down must only be called on surface contact"
@@ -231,7 +308,11 @@ class Game:
             self.active_piece.position = self.get_active_piece_translation(TranslateDirection.DOWN)
         self.lock_down()
 
-    def soft_drop(self): ...
+    def soft_drop(self):
+        new_position = self.get_active_piece_translation(TranslateDirection.DOWN)
+        if self.matrix.check_collision(new_position):
+            return
+        self.active_piece.position = new_position
 
     def left_shift(self):
         new_position = self.get_active_piece_translation(TranslateDirection.LEFT)
