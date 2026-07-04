@@ -6,7 +6,7 @@ class Matrix:
         self.matrix_width = matrix_width
         self.matrix_height = matrix_height
         self._matrix: list[list[Color]] = [
-            [0 for _ in range(matrix_width)] for _ in range(matrix_height)
+            [0 for _ in range(matrix_width)] for _ in range(matrix_height + 5)
         ]
 
     def check_collision(self, position: list[tuple[int, int]]) -> bool:
@@ -40,6 +40,6 @@ class Matrix:
         ]
 
     def __getitem__(self, index: int) -> list[Color]:
-        if not 0 <= index < self.matrix_height:
+        if not 0 <= index < self.matrix_height + 5:
             raise IndexError(f"matrix index {index} out of range [0, {self.matrix_height})")
         return self._matrix[index]
