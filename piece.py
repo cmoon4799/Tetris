@@ -1,5 +1,5 @@
 from enum import Enum, auto
-from random import shuffle
+from random import Random
 
 from matrix import Matrix
 from shared import Color
@@ -38,9 +38,9 @@ class Rotation(Enum):
     CCW = auto()
 
 
-def generate_random_bag() -> list[PieceType]:
+def generate_random_bag(rng: Random) -> list[PieceType]:
     bag = list(PieceType)
-    shuffle(bag)
+    rng.shuffle(bag)
     return bag
 
 

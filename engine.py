@@ -1,6 +1,7 @@
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum, auto
+from random import Random
 from typing import Callable
 
 from matrix import Matrix
@@ -38,15 +39,17 @@ class Engine:
 
     LINE_CLEAR_GOAL = 40
 
-    def __init__(self, fall_frame_rate: int, lock_down_frame_rate: int):
+    def __init__(self, fall_frame_rate: int, lock_down_frame_rate: int, seed: int | None = None):
+        rng = Random.seed(seed)
+
         # visible queue of pieces; pieces in the queue are replaced with those from the piece_bag
-        self.piece_queue: deque[PieceType] = deque(generate_random_bag())
-        self.piece_bag: deque[PieceType] = deque(generate_random_bag())
+        self.piece_queue: deque[PieceType] = deque(generate_random_bag(rng))
+        self.piece_bag: deque[PieceType] = deque(generate_random_bag(rng))
 
         self.held_piece: PieceType | None = None
         self.hold_disabled: bool = False
 
-        self.active_piece: ActivePiece | None = ActivePiece(self.piece_queue.popleft())
+        self.active_piece: ActivePiece = ActivePiece(self.piece_queue.popleft())
         self.matrix: Matrix = Matrix(
             matrix_width=self.MATRIX_WIDTH, matrix_height=(self.MATRIX_HEIGHT + self.BUFFER_HEIGHT)
         )
