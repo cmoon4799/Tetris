@@ -3,8 +3,6 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Callable
 
-import pygame
-
 from matrix import Matrix
 from piece import (
     ActivePiece,
@@ -38,9 +36,9 @@ class Engine:
     MATRIX_HEIGHT = 20
     BUFFER_HEIGHT = 5  # rendered space above the matrix skyline
 
-    LINE_CLEAR_GOAL = 1
+    LINE_CLEAR_GOAL = 40
 
-    def __init__(self):
+    def __init__(self, fall_frame_rate: int, lock_down_frame_rate: int):
         # visible queue of pieces; pieces in the queue are replaced with those from the piece_bag
         self.piece_queue: deque[PieceType] = deque(generate_random_bag())
         self.piece_bag: deque[PieceType] = deque(generate_random_bag())
@@ -48,23 +46,14 @@ class Engine:
         self.held_piece: PieceType | None = None
         self.hold_disabled: bool = False
 
-        self.active_piece: ActivePiece | None = ActivePiece(PieceType.I_PIECE)
+        self.active_piece: ActivePiece | None = ActivePiece(self.piece_queue.popleft())
         self.matrix: Matrix = Matrix(
             matrix_width=self.MATRIX_WIDTH, matrix_height=(self.MATRIX_HEIGHT + self.BUFFER_HEIGHT)
         )
         self.action_queue = deque()
 
-        pygame.init()
-
-        self.clock = pygame.time.Clock()
-        self.fps = 60  # frames per second
-        self.frame_ticks = 0
-
-        self.fall_speed = 0.8  # time in seconds it takes for the active piece to fall by one line
-        self.fall_frame_rate = round(self.fall_speed * self.fps)
-
-        self.lock_down_speed = 0.5  # time in seconds until piece is locked
-        self.lock_down_frame_rate = round(self.lock_down_speed * self.fps)
+        self.fall_frame_rate = fall_frame_rate
+        self.lock_down_frame_rate = lock_down_frame_rate
         self.lock_down_active = False
         self.lock_down_frame_ticks = 0
 
@@ -91,6 +80,7 @@ class Engine:
 
         self.running = True
         self.run_outcome: RunOutcome | None = None
+        self.frame_ticks = 0
 
     def process_frame(self, actions: list[Action]) -> None:
         for action in actions:
@@ -133,8 +123,6 @@ class Engine:
             if action in self.MOVEMENT_ACTIONS and result.success and self.lock_down_active:
                 self.lock_down_frame_ticks = 0
 
-        self.clock.tick(self.fps)
-
     # --- State Management ---
 
     def switch_on_lock_down(self) -> None:
@@ -157,7 +145,7 @@ class Engine:
             return True
         return False
 
-    def check_win_condition(self, result: ActionResult) -> None:
+    def check_win_condition(self, result: ActionResult) -> bool:
         """Check the victory condition and returns whether the condition has been met."""
 
         if self.matrix.lines_cleared >= self.LINE_CLEAR_GOAL:
@@ -280,6 +268,10 @@ class Engine:
 
         return ActionResult(True, True)
 
+    def quit(self) -> ActionResult:
+        self.running = False
+        return ActionResult(True)
+
     # --- Utilities ---
 
     def get_active_piece_translation(self, direction: TranslateDirection) -> list[tuple[int, int]]:
@@ -294,6 +286,3 @@ class Engine:
     def surface_contact(self) -> bool:
         new_position = self.get_active_piece_translation(TranslateDirection.DOWN)
         return self.matrix.check_collision(new_position)
-
-    def quit(self) -> None:
-        self.running = False

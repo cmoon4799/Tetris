@@ -5,8 +5,8 @@ class Matrix:
     def __init__(self, matrix_width: int, matrix_height: int):
         self.matrix_width: int = matrix_width
         self.matrix_height: int = matrix_height
-        self._matrix: list[list[Color]] = [
-            [0 for _ in range(matrix_width)] for _ in range(matrix_height + 5)
+        self._matrix: list[list[Color | None]] = [
+            [None for _ in range(matrix_width)] for _ in range(matrix_height)
         ]
         self.lines_cleared: int = 0
 
@@ -23,7 +23,7 @@ class Matrix:
             if i < 0:
                 return True
             # matrix collision
-            if i < self.matrix_height and self._matrix[i][j]:
+            if i < self.matrix_height and self._matrix[i][j] is not None:
                 return True
 
         return False
@@ -31,18 +31,18 @@ class Matrix:
     def clear(self) -> None:
         surviving_rows = []
         for row in self._matrix:
-            if any(cell == 0 for cell in row):
+            if any(cell is None for cell in row):
                 surviving_rows.append(row)
             else:
                 self.lines_cleared += 1
 
         self._matrix = [*surviving_rows]
         self._matrix += [
-            [0 for _ in range(self.matrix_width)]
+            [None for _ in range(self.matrix_width)]
             for _ in range(self.matrix_height - len(surviving_rows))
         ]
 
-    def __getitem__(self, index: int) -> list[Color]:
-        if not 0 <= index < self.matrix_height + 5:
+    def __getitem__(self, index: int) -> list[Color | None]:
+        if not 0 <= index < self.matrix_height:
             raise IndexError(f"matrix index {index} out of range [0, {self.matrix_height})")
         return self._matrix[index]

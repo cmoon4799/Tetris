@@ -15,7 +15,6 @@ class Action(Enum):
     SOFT_DROP = (auto(), False)
     HARD_DROP = (auto(), False)
     HOLD = (auto(), False)
-    GRAVITY = (auto(), False)
     QUIT = (auto(), False)
 
     # -- Engine Actions --
