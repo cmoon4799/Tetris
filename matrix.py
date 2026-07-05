@@ -42,6 +42,9 @@ class Matrix:
             for _ in range(self.matrix_height - len(surviving_rows))
         ]
 
+    def snapshot(self) -> tuple[tuple[int]]:
+        return (tuple(row) for row in self._matrix)
+
     def __getitem__(self, index: int) -> list[Color | None]:
         if not 0 <= index < self.matrix_height:
             raise IndexError(f"matrix index {index} out of range [0, {self.matrix_height})")

@@ -2,18 +2,7 @@ from enum import Enum, auto
 from random import Random
 
 from matrix import Matrix
-from shared import Color
-
-
-class PieceType(Enum):
-    I_PIECE = auto()
-    O_PIECE = auto()
-    T_PIECE = auto()
-    J_PIECE = auto()
-    L_PIECE = auto()
-    S_PIECE = auto()
-    Z_PIECE = auto()
-
+from shared import Color, PieceOrientation, PieceType
 
 PIECE_TO_COLOR_MAP = {
     PieceType.I_PIECE: Color.LIGHT_BLUE,
@@ -24,13 +13,6 @@ PIECE_TO_COLOR_MAP = {
     PieceType.S_PIECE: Color.GREEN,
     PieceType.Z_PIECE: Color.RED,
 }
-
-
-class PieceOrientation(Enum):
-    NORTH = auto()
-    EAST = auto()
-    SOUTH = auto()
-    WEST = auto()
 
 
 class Rotation(Enum):

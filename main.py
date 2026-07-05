@@ -10,13 +10,18 @@ if __name__ == "__main__":
     clock = pygame.time.Clock()
     fps = 60  # frames per second
 
-    fall_speed = 0.8  # time in seconds it takes for the active piece to fall by one line
-    fall_frame_rate = round(fall_speed * fps)
+    gravity_speed = 0.8  # time in seconds it takes for the active piece to fall by one line
+    gravity_frame_rate = round(gravity_speed * fps)
 
-    lock_down_speed = 0.5
+    lock_down_speed = 0.5  # time in seconds it takes for the active piece to lock on its surface
     lock_down_frame_rate = round(lock_down_speed * fps)
+    lock_down_reset_limit = 15  # number of resets allowed before immediate lock
 
-    engine = Engine(fall_frame_rate=fall_frame_rate, lock_down_frame_rate=lock_down_frame_rate)
+    engine = Engine(
+        gravity_frame_rate=gravity_frame_rate,
+        lock_down_frame_rate=lock_down_frame_rate,
+        lock_down_reset_limit=lock_down_reset_limit,
+    )
     renderer = Renderer(engine=engine)
     input_manager = PygameInputManager()
 

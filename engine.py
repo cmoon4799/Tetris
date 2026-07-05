@@ -7,7 +7,6 @@ from typing import Callable
 from matrix import Matrix
 from piece import (
     ActivePiece,
-    PieceType,
     Rotation,
     generate_random_bag,
     rotate_i_piece,
@@ -17,7 +16,7 @@ from piece import (
     rotate_t_piece,
     rotate_z_piece,
 )
-from shared import Action, RunOutcome
+from shared import Action, Observation, PieceType, RunOutcome
 
 
 class TranslateDirection(Enum):
@@ -39,12 +38,18 @@ class Engine:
 
     LINE_CLEAR_GOAL = 40
 
-    def __init__(self, fall_frame_rate: int, lock_down_frame_rate: int, seed: int | None = None):
-        rng = Random.seed(seed)
+    def __init__(
+        self,
+        gravity_frame_rate: int,
+        lock_down_frame_rate: int,
+        lock_down_reset_limit: int,
+        seed: int | None = None,
+    ):
+        self.rng = Random(seed)
 
         # visible queue of pieces; pieces in the queue are replaced with those from the piece_bag
-        self.piece_queue: deque[PieceType] = deque(generate_random_bag(rng))
-        self.piece_bag: deque[PieceType] = deque(generate_random_bag(rng))
+        self.piece_queue: deque[PieceType] = deque(generate_random_bag(self.rng))
+        self.piece_bag: deque[PieceType] = deque(generate_random_bag(self.rng))
 
         self.held_piece: PieceType | None = None
         self.hold_disabled: bool = False
@@ -55,10 +60,14 @@ class Engine:
         )
         self.action_queue = deque()
 
-        self.fall_frame_rate = fall_frame_rate
+        self.gravity_frame_rate = gravity_frame_rate
         self.lock_down_frame_rate = lock_down_frame_rate
+        self.lock_down_reset_limit = lock_down_reset_limit
         self.lock_down_active = False
         self.lock_down_frame_ticks = 0
+        self.lock_down_reset_count = 0
+        # when the piece dips below its lowest row reached, lock down resets
+        self.lowest_row = self.active_piece.min_row
 
         self.ACTION_TO_CONTROL_MAP: dict[Action, Callable[[], ActionResult]] = {
             Action.RIGHT_SHIFT: self.right_shift,
@@ -97,9 +106,13 @@ class Engine:
         self.action_queue.clear()
         self.action_queue.extend(actions)
 
-        if self.lock_down_frame_ticks == self.lock_down_frame_rate and self.surface_contact():
-            self.action_queue.appendleft(Action.LOCK_DOWN)
-        if self.frame_ticks > 0 and self.frame_ticks % self.fall_frame_rate == 0:
+        if self.lock_down_active:
+            if (
+                self.lock_down_frame_ticks >= self.lock_down_frame_rate
+                or self.lock_down_reset_count >= self.lock_down_reset_limit
+            ) and self.surface_contact():
+                self.action_queue.appendleft(Action.LOCK_DOWN)
+        if self.frame_ticks > 0 and self.frame_ticks % self.gravity_frame_rate == 0:
             self.action_queue.appendleft(Action.FALL)
 
         while self.action_queue:
@@ -116,26 +129,36 @@ class Engine:
             if result.piece_generated:
                 break
 
-            if self.surface_contact():
-                self.switch_on_lock_down()
-            else:
+            if self.active_piece.min_row < self.lowest_row:
+                self.lowest_row = self.active_piece.min_row
                 self.switch_off_lock_down()
 
-            # in Infinite Lock Down, any successful movement action resets the lock down
-            # frame counter
-            if action in self.MOVEMENT_ACTIONS and result.success and self.lock_down_active:
+            switched_on = False
+            if self.surface_contact() and not self.lock_down_active:
+                switched_on = True
+                self.switch_on_lock_down()
+
+            if (
+                action in self.MOVEMENT_ACTIONS
+                and result.success
+                and self.lock_down_active
+                and not switched_on
+            ):
                 self.lock_down_frame_ticks = 0
+                self.lock_down_reset_count += 1
 
     # --- State Management ---
 
     def switch_on_lock_down(self) -> None:
         if not self.lock_down_active:
             self.lock_down_frame_ticks = 0
+            self.lock_down_reset_count = 0
         self.lock_down_active = True
 
     def switch_off_lock_down(self) -> None:
         self.lock_down_active = False
         self.lock_down_frame_ticks = 0
+        self.lock_down_reset_count = 0
 
     # --- Game Logic ---
 
@@ -163,7 +186,9 @@ class Engine:
         self.active_piece = ActivePiece(self.piece_queue.popleft())
         self.piece_queue.append(self.piece_bag.popleft())
         if not self.piece_bag:
-            self.piece_bag = deque(generate_random_bag())
+            self.piece_bag = deque(generate_random_bag(self.rng))
+
+        self.lowest_row = self.active_piece.min_row
 
     # --- Input Handlers ---
 
@@ -289,3 +314,24 @@ class Engine:
     def surface_contact(self) -> bool:
         new_position = self.get_active_piece_translation(TranslateDirection.DOWN)
         return self.matrix.check_collision(new_position)
+
+    def build_observation(self) -> Observation:
+        gravity_frames_remaining = self.gravity_frame_rate - (
+            self.frame_ticks % self.gravity_frame_rate
+        )
+        lock_down_frames_remaining = self.lock_down_frame_rate - self.lock_down_frame_ticks
+        lock_down_resets_remaining = self.lock_down_reset_limit - self.lock_down_reset_count
+
+        return Observation(
+            matrix=self.matrix.snapshot(),
+            active_piece_type=self.active_piece.piece_type,
+            active_piece_position=tuple(self.active_piece.position),
+            active_piece_orientation=self.active_piece.orientation,
+            held_piece=self.held_piece,
+            hold_disabled=self.hold_disabled,
+            piece_queue=tuple(self.piece_queue),
+            gravity_frames_remaining=gravity_frames_remaining,
+            lock_down_active=self.lock_down_active,
+            lock_down_frames_remaining=lock_down_frames_remaining,
+            lock_down_resets_remaining=lock_down_resets_remaining,
+        )

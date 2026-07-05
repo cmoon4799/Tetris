@@ -3,11 +3,9 @@ import pygame
 from engine import Engine
 from piece import (
     PIECE_TO_COLOR_MAP,
-    PieceOrientation,
-    PieceType,
     generate_position_with_anchor,
 )
-from shared import Color
+from shared import Color, PieceOrientation, PieceType
 
 
 class Renderer:
