@@ -5,7 +5,7 @@ from piece import (
     PIECE_TO_COLOR_MAP,
     generate_position_with_anchor,
 )
-from shared import Color, PieceOrientation, PieceType
+from shared import CONFIG, Color, PieceOrientation, PieceType
 
 
 class Renderer:
@@ -16,7 +16,9 @@ class Renderer:
     FRAMED_PIECE_WIDTH = 5  # in unit of CELL_SIZE
     FRAMED_PIECE_HEIGHT = 3  # in unit of CELL_SIZE
 
-    VISIBLE_QUEUE_SIZE = 6  # number of visible pieces in the queue
+    VISIBLE_QUEUE_SIZE = CONFIG.visible_queue_size
+    MATRIX_HEIGHT = CONFIG.matrix_height
+    MATRIX_WIDTH = CONFIG.matrix_width
 
     COLOR_MAP = {
         Color.YELLOW: (255, 255, 0),
@@ -38,16 +40,13 @@ class Renderer:
         # * A * B * C *
         # where A, B, C are the held piece, matrix, queue respectively and * represents the
         # borders in between
-
         horizontal_sections = [
-            self.engine.MATRIX_WIDTH,
+            self.MATRIX_WIDTH,
             self.FRAMED_PIECE_WIDTH,
             self.FRAMED_PIECE_WIDTH,
         ]
         window_width = (sum(horizontal_sections) + len(horizontal_sections) + 1) * self.CELL_SIZE
-        window_height = (
-            self.engine.MATRIX_HEIGHT + self.TOP_MARGIN + self.BOTTOM_MARGIN
-        ) * self.CELL_SIZE
+        window_height = (self.MATRIX_HEIGHT + self.TOP_MARGIN + self.BOTTOM_MARGIN) * self.CELL_SIZE
         self.screen = pygame.display.set_mode((window_width, window_height))
 
     def render(self) -> None:
@@ -114,23 +113,23 @@ class Renderer:
     def render_matrix(self) -> None:
         """Render the game matrix and active piece."""
         matrix_anchor_x, matrix_anchor_y = (self.FRAMED_PIECE_WIDTH + 2, self.TOP_MARGIN)
-        for i in range(self.engine.MATRIX_HEIGHT + self.engine.BUFFER_HEIGHT):
-            for j in range(self.engine.MATRIX_WIDTH):
+        for i in range(self.MATRIX_HEIGHT + self.engine.BUFFER_HEIGHT):
+            for j in range(self.MATRIX_WIDTH):
                 x = (j + matrix_anchor_x) * self.CELL_SIZE
-                y = (self.engine.MATRIX_HEIGHT - 1 - i + matrix_anchor_y) * self.CELL_SIZE
+                y = (self.MATRIX_HEIGHT - 1 - i + matrix_anchor_y) * self.CELL_SIZE
 
                 cell = pygame.Rect(x, y, self.CELL_SIZE, self.CELL_SIZE)
                 if self.engine.matrix[i][j]:
                     color = self.COLOR_MAP[self.engine.matrix[i][j]]
                     pygame.draw.rect(self.screen, color, cell)
-                if i < self.engine.MATRIX_HEIGHT:
+                if i < self.MATRIX_HEIGHT:
                     pygame.draw.rect(self.screen, self.COLOR_MAP[Color.CYAN], cell, width=1)
 
     def render_active_piece(self) -> None:
         matrix_anchor_x, matrix_anchor_y = (self.FRAMED_PIECE_WIDTH + 2, self.TOP_MARGIN)
         for i, j in self.engine.active_piece.position:
             x = (j + matrix_anchor_x) * self.CELL_SIZE
-            y = (self.engine.MATRIX_HEIGHT - 1 - i + matrix_anchor_y) * self.CELL_SIZE
+            y = (self.MATRIX_HEIGHT - 1 - i + matrix_anchor_y) * self.CELL_SIZE
 
             cell = pygame.Rect(x, y, self.CELL_SIZE, self.CELL_SIZE)
             # color = self.COLOR_MAP[self.engine.active_piece.color]
@@ -139,7 +138,7 @@ class Renderer:
 
     def render_queue(self) -> None:
         """Render the piece preview queue."""
-        offset_x = (3 + self.FRAMED_PIECE_WIDTH + self.engine.MATRIX_WIDTH) * self.CELL_SIZE
+        offset_x = (3 + self.FRAMED_PIECE_WIDTH + self.MATRIX_WIDTH) * self.CELL_SIZE
         offset_y = self.TOP_MARGIN * self.CELL_SIZE
         queue_height = self.FRAMED_PIECE_HEIGHT * self.CELL_SIZE * self.VISIBLE_QUEUE_SIZE
         queue_width = self.FRAMED_PIECE_WIDTH * self.CELL_SIZE

@@ -16,11 +16,21 @@ class Action(Enum):
     SOFT_DROP = (auto(), False)
     HARD_DROP = (auto(), False)
     HOLD = (auto(), False)
-    QUIT = (auto(), False)
 
     # -- Engine Actions --
     FALL = (auto(), True)
     LOCK_DOWN = (auto(), True)
+
+
+PLAYER_ACTION_SPACE = [
+    Action.CW_ROTATE,
+    Action.CCW_ROTATE,
+    Action.RIGHT_SHIFT,
+    Action.LEFT_SHIFT,
+    Action.SOFT_DROP,
+    Action.HARD_DROP,
+    Action.HOLD,
+]
 
 
 class Color(Enum):
@@ -56,6 +66,34 @@ class PieceOrientation(Enum):
     EAST = auto()
     SOUTH = auto()
     WEST = auto()
+
+
+@dataclass(frozen=True)
+class GameConfig:
+    fps: int  # frames per second
+    gravity_speed: float  # time in seconds it takes for the active piece to fall by one line
+    lock_down_speed: float  # time in seconds it takes for the active piece to lock on its surface
+    lock_down_reset_limit: int  # number of resets allowed before immediate lock
+    matrix_height: int  # active game area height; does not account for the invisible buffer above
+    matrix_width: int  # active game area width
+    piece_count: int  # the total number of pieces; theoretically, we can have more than 7
+    visible_queue_size: int  # the number of visible pieces in the queue
+    line_clear_goal: int  # victory condition
+
+
+# module level instance; modules are singletons, so there is only a single
+# canonical dataclass representing the game settings and constants
+CONFIG = GameConfig(
+    fps=60,
+    gravity_speed=0.8,
+    lock_down_speed=0.5,
+    lock_down_reset_limit=15,
+    matrix_height=20,
+    matrix_width=10,
+    piece_count=7,
+    visible_queue_size=6,
+    line_clear_goal=40,
+)
 
 
 @dataclass(frozen=True)

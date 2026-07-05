@@ -16,7 +16,7 @@ from piece import (
     rotate_t_piece,
     rotate_z_piece,
 )
-from shared import Action, Observation, PieceType, RunOutcome
+from shared import CONFIG, Action, Observation, PieceType, RunOutcome
 
 
 class TranslateDirection(Enum):
@@ -32,20 +32,26 @@ class ActionResult:
 
 
 class Engine:
-    MATRIX_WIDTH = 10
-    MATRIX_HEIGHT = 20
-    BUFFER_HEIGHT = 5  # rendered space above the matrix skyline
+    BUFFER_HEIGHT = 5  # buffer above the matrix skyline
 
-    LINE_CLEAR_GOAL = 40
+    # configuration constants
+    LINE_CLEAR_GOAL = CONFIG.line_clear_goal
+    MATRIX_HEIGHT = CONFIG.matrix_height
+    MATRIX_WIDTH = CONFIG.matrix_width
+    FPS = CONFIG.fps
+    GRAVITY_SPEED = CONFIG.gravity_speed
+    LOCK_DOWN_SPEED = CONFIG.lock_down_speed
+    LOCK_DOWN_RESET_LIMIT = CONFIG.lock_down_reset_limit
 
     def __init__(
         self,
-        gravity_frame_rate: int,
-        lock_down_frame_rate: int,
-        lock_down_reset_limit: int,
         seed: int | None = None,
     ):
         self.rng = Random(seed)
+
+        self.matrix: Matrix = Matrix(
+            matrix_height=(self.MATRIX_HEIGHT + self.BUFFER_HEIGHT), matrix_width=self.MATRIX_WIDTH
+        )
 
         # visible queue of pieces; pieces in the queue are replaced with those from the piece_bag
         self.piece_queue: deque[PieceType] = deque(generate_random_bag(self.rng))
@@ -55,14 +61,11 @@ class Engine:
         self.hold_disabled: bool = False
 
         self.active_piece: ActivePiece = ActivePiece(self.piece_queue.popleft())
-        self.matrix: Matrix = Matrix(
-            matrix_width=self.MATRIX_WIDTH, matrix_height=(self.MATRIX_HEIGHT + self.BUFFER_HEIGHT)
-        )
         self.action_queue = deque()
 
-        self.gravity_frame_rate = gravity_frame_rate
-        self.lock_down_frame_rate = lock_down_frame_rate
-        self.lock_down_reset_limit = lock_down_reset_limit
+        self.gravity_frame_rate = self.GRAVITY_SPEED * self.FPS
+        self.lock_down_frame_rate = self.LOCK_DOWN_SPEED * self.FPS
+        self.lock_down_reset_limit = self.LOCK_DOWN_RESET_LIMIT
         self.lock_down_active = False
         self.lock_down_frame_ticks = 0
         self.lock_down_reset_count = 0
@@ -77,7 +80,6 @@ class Engine:
             Action.CW_ROTATE: self.cw_rotate,
             Action.CCW_ROTATE: self.ccw_rotate,
             Action.HOLD: self.hold_piece,
-            Action.QUIT: self.quit,
             Action.FALL: self.fall,
             Action.LOCK_DOWN: self.lock_down,
         }
@@ -295,10 +297,6 @@ class Engine:
         self.hold_disabled = True
 
         return ActionResult(True, True)
-
-    def quit(self) -> ActionResult:
-        self.running = False
-        return ActionResult(True)
 
     # --- Utilities ---
 

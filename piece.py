@@ -2,7 +2,7 @@ from enum import Enum, auto
 from random import Random
 
 from matrix import Matrix
-from shared import Color, PieceOrientation, PieceType
+from shared import CONFIG, Color, PieceOrientation, PieceType
 
 PIECE_TO_COLOR_MAP = {
     PieceType.I_PIECE: Color.LIGHT_BLUE,
@@ -37,21 +37,54 @@ class ActivePiece:
         self.lowest_row = self.min_row
 
     def load_starting_position(self):
+        spawn_row = CONFIG.matrix_height
+        left_spawn_col = CONFIG.matrix_width // 2 - 2
+
         match self.piece_type:
             case PieceType.I_PIECE:
-                self.position = [(20, 3), (20, 4), (20, 5), (20, 6)]
+                self.position = [(spawn_row, left_spawn_col + offset) for offset in range(4)]
             case PieceType.O_PIECE:
-                self.position = [(20, 4), (20, 5), (21, 4), (21, 5)]
+                self.position = [
+                    (spawn_row, left_spawn_col + 1),
+                    (spawn_row, left_spawn_col + 2),
+                    (spawn_row + 1, left_spawn_col + 1),
+                    (spawn_row + 1, left_spawn_col + 2),
+                ]
             case PieceType.T_PIECE:
-                self.position = [(20, 3), (20, 4), (20, 5), (21, 4)]
+                self.position = [
+                    (spawn_row, left_spawn_col),
+                    (spawn_row, left_spawn_col + 1),
+                    (spawn_row, left_spawn_col + 2),
+                    (spawn_row + 1, left_spawn_col + 1),
+                ]
             case PieceType.L_PIECE:
-                self.position = [(20, 3), (20, 4), (20, 5), (21, 5)]
+                self.position = [
+                    (spawn_row, left_spawn_col),
+                    (spawn_row, left_spawn_col + 1),
+                    (spawn_row, left_spawn_col + 2),
+                    (spawn_row + 1, left_spawn_col + 2),
+                ]
             case PieceType.J_PIECE:
-                self.position = [(20, 3), (20, 4), (20, 5), (21, 3)]
+                self.position = [
+                    (spawn_row, left_spawn_col),
+                    (spawn_row, left_spawn_col + 1),
+                    (spawn_row, left_spawn_col + 2),
+                    (spawn_row + 1, left_spawn_col),
+                ]
             case PieceType.S_PIECE:
-                self.position = [(20, 3), (20, 4), (21, 4), (21, 5)]
+                self.position = [
+                    (spawn_row, left_spawn_col),
+                    (spawn_row, left_spawn_col + 1),
+                    (spawn_row + 1, left_spawn_col + 1),
+                    (spawn_row + 1, left_spawn_col + 2),
+                ]
             case PieceType.Z_PIECE:
-                self.position = [(21, 3), (21, 4), (20, 4), (20, 5)]
+                self.position = [
+                    (spawn_row + 1, left_spawn_col),
+                    (spawn_row + 1, left_spawn_col + 1),
+                    (spawn_row, left_spawn_col + 1),
+                    (spawn_row, left_spawn_col + 2),
+                ]
 
     @property
     def anchor(self):
