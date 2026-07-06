@@ -10,7 +10,7 @@ class Matrix:
         ]
         self.lines_cleared: int = 0
 
-    def check_collision(self, position: list[tuple[int, int]]) -> bool:
+    def check_collision(self, position: tuple[tuple[int, int], ...]) -> bool:
         """Check if the provided position collides with existing pieces of the matrix or the walls
         of the matrix.
         """
@@ -43,7 +43,7 @@ class Matrix:
         ]
 
     def snapshot(self) -> tuple[tuple[int]]:
-        return (tuple(row) for row in self._matrix)
+        return tuple(tuple(row) for row in self._matrix)
 
     def __getitem__(self, index: int) -> list[Color | None]:
         if not 0 <= index < self.matrix_height:

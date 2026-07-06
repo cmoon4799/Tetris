@@ -3,7 +3,7 @@ import pygame
 from engine import Engine
 from piece import (
     PIECE_TO_COLOR_MAP,
-    generate_position_with_anchor,
+    generate_anchor_relative_position,
 )
 from shared import CONFIG, Color, PieceOrientation, PieceType
 
@@ -83,7 +83,7 @@ class Renderer:
             return
 
         offset_x, offset_y = offset
-        position = generate_position_with_anchor(
+        position = generate_anchor_relative_position(
             piece_type=piece_type,
             orientation=PieceOrientation.NORTH,
             anchor=(0, 0),

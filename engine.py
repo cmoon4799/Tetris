@@ -12,11 +12,12 @@ from piece import (
     rotate_i_piece,
     rotate_j_piece,
     rotate_l_piece,
+    rotate_orientation,
     rotate_s_piece,
     rotate_t_piece,
     rotate_z_piece,
 )
-from shared import CONFIG, Action, Observation, PieceType, RunOutcome
+from shared import CONFIG, PLAYER_ACTION_SPACE, Action, Observation, PieceType, RunOutcome
 
 
 class TranslateDirection(Enum):
@@ -32,12 +33,10 @@ class ActionResult:
 
 
 class Engine:
-    BUFFER_HEIGHT = 5  # buffer above the matrix skyline
-
-    # configuration constants
     LINE_CLEAR_GOAL = CONFIG.line_clear_goal
     MATRIX_HEIGHT = CONFIG.matrix_height
     MATRIX_WIDTH = CONFIG.matrix_width
+    BUFFER_HEIGHT = CONFIG.buffer_height  # buffer above the matrix skyline
     FPS = CONFIG.fps
     GRAVITY_SPEED = CONFIG.gravity_speed
     LOCK_DOWN_SPEED = CONFIG.lock_down_speed
@@ -247,41 +246,78 @@ class Engine:
         self.action_queue.appendleft(Action.LOCK_DOWN)
         return ActionResult(True)
 
-    def cw_rotate(self) -> ActionResult:
+    def get_active_piece_rotated_position(
+        self, rotation: Rotation
+    ) -> tuple[tuple[int, int], ...] | None:
         match self.active_piece.piece_type:
             case PieceType.I_PIECE:
-                success = rotate_i_piece(self.matrix, self.active_piece, Rotation.CW)
+                return rotate_i_piece(
+                    self.matrix,
+                    self.active_piece.position,
+                    self.active_piece.orientation,
+                    rotation,
+                )
             case PieceType.T_PIECE:
-                success = rotate_t_piece(self.matrix, self.active_piece, Rotation.CW)
+                return rotate_t_piece(
+                    self.matrix,
+                    self.active_piece.position,
+                    self.active_piece.orientation,
+                    rotation,
+                )
             case PieceType.L_PIECE:
-                success = rotate_l_piece(self.matrix, self.active_piece, Rotation.CW)
+                return rotate_l_piece(
+                    self.matrix,
+                    self.active_piece.position,
+                    self.active_piece.orientation,
+                    rotation,
+                )
             case PieceType.J_PIECE:
-                success = rotate_j_piece(self.matrix, self.active_piece, Rotation.CW)
+                return rotate_j_piece(
+                    self.matrix,
+                    self.active_piece.position,
+                    self.active_piece.orientation,
+                    rotation,
+                )
             case PieceType.S_PIECE:
-                success = rotate_s_piece(self.matrix, self.active_piece, Rotation.CW)
+                return rotate_s_piece(
+                    self.matrix,
+                    self.active_piece.position,
+                    self.active_piece.orientation,
+                    rotation,
+                )
             case PieceType.Z_PIECE:
-                success = rotate_z_piece(self.matrix, self.active_piece, Rotation.CW)
+                return rotate_z_piece(
+                    self.matrix,
+                    self.active_piece.position,
+                    self.active_piece.orientation,
+                    rotation,
+                )
             case PieceType.O_PIECE:
-                success = False
-        return ActionResult(success)
+                return None
+
+    def cw_rotate(self) -> ActionResult:
+        new_position = self.get_active_piece_rotated_position(Rotation.CW)
+
+        if new_position is not None:
+            self.active_piece.position = new_position
+            self.active_piece.orientation = rotate_orientation(
+                self.active_piece.orientation, Rotation.CW
+            )
+            return ActionResult(True)
+
+        return ActionResult(False)
 
     def ccw_rotate(self) -> ActionResult:
-        match self.active_piece.piece_type:
-            case PieceType.I_PIECE:
-                success = rotate_i_piece(self.matrix, self.active_piece, Rotation.CCW)
-            case PieceType.T_PIECE:
-                success = rotate_t_piece(self.matrix, self.active_piece, Rotation.CCW)
-            case PieceType.L_PIECE:
-                success = rotate_l_piece(self.matrix, self.active_piece, Rotation.CCW)
-            case PieceType.J_PIECE:
-                success = rotate_j_piece(self.matrix, self.active_piece, Rotation.CCW)
-            case PieceType.S_PIECE:
-                success = rotate_s_piece(self.matrix, self.active_piece, Rotation.CCW)
-            case PieceType.Z_PIECE:
-                success = rotate_z_piece(self.matrix, self.active_piece, Rotation.CCW)
-            case PieceType.O_PIECE:
-                success = False
-        return ActionResult(success)
+        new_position = self.get_active_piece_rotated_position(Rotation.CCW)
+
+        if new_position is not None:
+            self.active_piece.position = new_position
+            self.active_piece.orientation = rotate_orientation(
+                self.active_piece.orientation, Rotation.CCW
+            )
+            return ActionResult(True)
+
+        return ActionResult(False)
 
     def hold_piece(self) -> ActionResult:
         if self.hold_disabled:
@@ -300,18 +336,45 @@ class Engine:
 
     # --- Utilities ---
 
-    def get_active_piece_translation(self, direction: TranslateDirection) -> list[tuple[int, int]]:
+    def get_active_piece_translation(
+        self, direction: TranslateDirection
+    ) -> tuple[tuple[int, int], ...]:
         match direction:
             case TranslateDirection.DOWN:
-                return [(i - 1, j) for (i, j) in self.active_piece.position]
+                return tuple((i - 1, j) for (i, j) in self.active_piece.position)
             case TranslateDirection.LEFT:
-                return [(i, j - 1) for (i, j) in self.active_piece.position]
+                return tuple((i, j - 1) for (i, j) in self.active_piece.position)
             case TranslateDirection.RIGHT:
-                return [(i, j + 1) for (i, j) in self.active_piece.position]
+                return tuple((i, j + 1) for (i, j) in self.active_piece.position)
 
     def surface_contact(self) -> bool:
         new_position = self.get_active_piece_translation(TranslateDirection.DOWN)
         return self.matrix.check_collision(new_position)
+
+    def build_action_mask(self) -> tuple[bool]:
+        mask = [False for _ in range(len(PLAYER_ACTION_SPACE))]
+
+        for i, action in enumerate(PLAYER_ACTION_SPACE):
+            match action:
+                case Action.LEFT_SHIFT:
+                    new_position = self.get_active_piece_translation(TranslateDirection.LEFT)
+                    mask[i] = not self.matrix.check_collision(new_position)
+                case Action.RIGHT_SHIFT:
+                    new_position = self.get_active_piece_translation(TranslateDirection.LEFT)
+                    mask[i] = not self.matrix.check_collision(new_position)
+                case Action.SOFT_DROP:
+                    new_position = self.get_active_piece_translation(TranslateDirection.DOWN)
+                    mask[i] = not self.matrix.check_collision(new_position)
+                case Action.HARD_DROP:
+                    mask[i] = True
+                case Action.CW_ROTATE:
+                    mask[i] = self.get_active_piece_rotated_position(Rotation.CW) is not None
+                case Action.CCW_ROTATE:
+                    mask[i] = self.get_active_piece_rotated_position(Rotation.CCW) is not None
+                case Action.HOLD:
+                    mask[i] = not self.hold_disabled
+
+        return mask
 
     def build_observation(self) -> Observation:
         gravity_frames_remaining = self.gravity_frame_rate - (
@@ -327,6 +390,7 @@ class Engine:
             active_piece_orientation=self.active_piece.orientation,
             held_piece=self.held_piece,
             hold_disabled=self.hold_disabled,
+            action_mask=self.build_action_mask(),
             piece_queue=tuple(self.piece_queue),
             gravity_frames_remaining=gravity_frames_remaining,
             lock_down_active=self.lock_down_active,

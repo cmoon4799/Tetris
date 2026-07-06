@@ -12,3 +12,4 @@ Implemented using the 2009 Tetris Design Guideline
 - Stop drift of gameplay dimensions across classes.
 - Remove direct renderer access to mutable engine internals.
 - Refactor `piece.py` toward data driven tables to reduce duplicated logic.
+- Make naming of matrix height, either with or without buffer height, consistent.

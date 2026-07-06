@@ -4,17 +4,20 @@ from enum import Enum, auto
 
 class Action(Enum):
     restricted: bool
+    value: int
 
     def __init__(self, _: int, restricted: bool):
+        # whether the action is player restricted; playerinput may only derive from
+        # non restricted Actions
         self.restricted = restricted
 
     # -- Player Input Actions --
-    CW_ROTATE = (auto(), False)
-    CCW_ROTATE = (auto(), False)
-    RIGHT_SHIFT = (auto(), False)
     LEFT_SHIFT = (auto(), False)
+    RIGHT_SHIFT = (auto(), False)
     SOFT_DROP = (auto(), False)
     HARD_DROP = (auto(), False)
+    CW_ROTATE = (auto(), False)
+    CCW_ROTATE = (auto(), False)
     HOLD = (auto(), False)
 
     # -- Engine Actions --
@@ -22,15 +25,15 @@ class Action(Enum):
     LOCK_DOWN = (auto(), True)
 
 
-PLAYER_ACTION_SPACE = [
-    Action.CW_ROTATE,
-    Action.CCW_ROTATE,
-    Action.RIGHT_SHIFT,
+PLAYER_ACTION_SPACE = (
     Action.LEFT_SHIFT,
+    Action.RIGHT_SHIFT,
     Action.SOFT_DROP,
     Action.HARD_DROP,
+    Action.CW_ROTATE,
+    Action.CCW_ROTATE,
     Action.HOLD,
-]
+)
 
 
 class Color(Enum):
@@ -76,6 +79,7 @@ class GameConfig:
     lock_down_reset_limit: int  # number of resets allowed before immediate lock
     matrix_height: int  # active game area height; does not account for the invisible buffer above
     matrix_width: int  # active game area width
+    buffer_height: int  # buffer above the matrix skyline
     piece_count: int  # the total number of pieces; theoretically, we can have more than 7
     visible_queue_size: int  # the number of visible pieces in the queue
     line_clear_goal: int  # victory condition
@@ -90,6 +94,7 @@ CONFIG = GameConfig(
     lock_down_reset_limit=15,
     matrix_height=20,
     matrix_width=10,
+    buffer_height=5,
     piece_count=7,
     visible_queue_size=6,
     line_clear_goal=40,
@@ -104,6 +109,7 @@ class Observation:
     active_piece_orientation: PieceOrientation
     held_piece: PieceType | None
     hold_disabled: bool
+    action_mask: tuple[bool]
     piece_queue: tuple[PieceType]
     gravity_frames_remaining: int
     lock_down_active: bool
