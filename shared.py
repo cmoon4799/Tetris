@@ -6,23 +6,24 @@ class Action(Enum):
     restricted: bool
     value: int
 
-    def __init__(self, _: int, restricted: bool):
+    def __init__(self, value: int, restricted: bool):
         # whether the action is player restricted; playerinput may only derive from
         # non restricted Actions
+        self._value_ = value
         self.restricted = restricted
 
     # -- Player Input Actions --
-    LEFT_SHIFT = (auto(), False)
-    RIGHT_SHIFT = (auto(), False)
-    SOFT_DROP = (auto(), False)
-    HARD_DROP = (auto(), False)
-    CW_ROTATE = (auto(), False)
-    CCW_ROTATE = (auto(), False)
-    HOLD = (auto(), False)
+    LEFT_SHIFT = (0, False)
+    RIGHT_SHIFT = (1, False)
+    SOFT_DROP = (2, False)
+    HARD_DROP = (3, False)
+    CW_ROTATE = (4, False)
+    CCW_ROTATE = (5, False)
+    HOLD = (6, False)
 
     # -- Engine Actions --
-    FALL = (auto(), True)
-    LOCK_DOWN = (auto(), True)
+    FALL = (99, True)
+    LOCK_DOWN = (100, True)
 
 
 PLAYER_ACTION_SPACE = (
@@ -94,7 +95,7 @@ CONFIG = GameConfig(
     lock_down_reset_limit=15,
     matrix_height=20,
     matrix_width=10,
-    buffer_height=5,
+    buffer_height=10,
     piece_count=7,
     visible_queue_size=6,
     line_clear_goal=40,
@@ -103,6 +104,13 @@ CONFIG = GameConfig(
 
 @dataclass(frozen=True)
 class Observation:
+    """
+    Attributes:
+        action_mask: boolean mask of valid actions at the given moment
+        lines_cleared: lines cleared thus far
+        run_outcome: indicates Victory or Defeat or still running if None
+    """
+
     matrix: tuple[tuple[Color | None]]
     active_piece_type: PieceType
     active_piece_position: tuple[tuple[int, int]]
@@ -115,10 +123,5 @@ class Observation:
     lock_down_active: bool
     lock_down_frames_remaining: int
     lock_down_resets_remaining: int
-
-
-@dataclass(frozen=True)
-class FrameResult:
-    observation: Observation
     lines_cleared: int
-    terminated: bool
+    run_outcome: RunOutcome | None

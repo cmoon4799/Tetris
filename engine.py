@@ -17,7 +17,14 @@ from piece import (
     rotate_t_piece,
     rotate_z_piece,
 )
-from shared import CONFIG, PLAYER_ACTION_SPACE, Action, Observation, PieceType, RunOutcome
+from shared import (
+    CONFIG,
+    PLAYER_ACTION_SPACE,
+    Action,
+    Observation,
+    PieceType,
+    RunOutcome,
+)
 
 
 class TranslateDirection(Enum):
@@ -354,6 +361,9 @@ class Engine:
     def build_action_mask(self) -> tuple[bool]:
         mask = [False for _ in range(len(PLAYER_ACTION_SPACE))]
 
+        if self.run_outcome is not None:
+            return mask
+
         for i, action in enumerate(PLAYER_ACTION_SPACE):
             match action:
                 case Action.LEFT_SHIFT:
@@ -396,4 +406,6 @@ class Engine:
             lock_down_active=self.lock_down_active,
             lock_down_frames_remaining=lock_down_frames_remaining,
             lock_down_resets_remaining=lock_down_resets_remaining,
+            lines_cleared=self.matrix.lines_cleared,
+            run_outcome=self.run_outcome,
         )
