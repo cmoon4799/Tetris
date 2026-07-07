@@ -3,7 +3,7 @@ from enum import Enum, auto
 from random import Random
 
 from matrix import Matrix
-from shared import CONFIG, Color, PieceOrientation, PieceType
+from shared import CONFIG, Color, PieceOrientation, PieceType, TranslateDirection
 
 PIECE_TO_COLOR_MAP = {
     PieceType.I_PIECE: Color.LIGHT_BLUE,
@@ -36,6 +36,11 @@ class ActivePiece:
 
         self.load_starting_position()
         self.lowest_row = self.min_row
+
+        self.rotations = 0
+        self.left_translations = 0
+        self.right_translations = 0
+        self.down_translations = 0
 
     def load_starting_position(self):
         spawn_row = CONFIG.matrix_height
@@ -86,6 +91,96 @@ class ActivePiece:
                     (spawn_row, left_spawn_col + 1),
                     (spawn_row, left_spawn_col + 2),
                 )
+
+    def get_translated_position(self, direction: TranslateDirection) -> tuple[tuple[int, int], ...]:
+        """Return the would be position in the matrix without translating the piece."""
+
+        match direction:
+            case TranslateDirection.DOWN:
+                return tuple((i - 1, j) for (i, j) in self.position)
+            case TranslateDirection.LEFT:
+                return tuple((i, j - 1) for (i, j) in self.position)
+            case TranslateDirection.RIGHT:
+                return tuple((i, j + 1) for (i, j) in self.position)
+
+    def get_rotated_position(
+        self, rotation: Rotation, matrix: Matrix
+    ) -> tuple[tuple[int, int], ...] | None:
+        """Return the would be position in the matrix without rotating the piece; if rotation is not
+        possible, return None.
+        """
+
+        match self.piece_type:
+            case PieceType.I_PIECE:
+                return rotate_i_piece(
+                    matrix,
+                    self.position,
+                    self.orientation,
+                    rotation,
+                )
+            case PieceType.T_PIECE:
+                return rotate_t_piece(
+                    matrix,
+                    self.position,
+                    self.orientation,
+                    rotation,
+                )
+            case PieceType.L_PIECE:
+                return rotate_l_piece(
+                    matrix,
+                    self.position,
+                    self.orientation,
+                    rotation,
+                )
+            case PieceType.J_PIECE:
+                return rotate_j_piece(
+                    matrix,
+                    self.position,
+                    self.orientation,
+                    rotation,
+                )
+            case PieceType.S_PIECE:
+                return rotate_s_piece(
+                    matrix,
+                    self.position,
+                    self.orientation,
+                    rotation,
+                )
+            case PieceType.Z_PIECE:
+                return rotate_z_piece(
+                    matrix,
+                    self.position,
+                    self.orientation,
+                    rotation,
+                )
+            case PieceType.O_PIECE:
+                return None
+
+    def rotate(self, rotation: Rotation, matrix: Matrix) -> bool:
+        """Rotate the active piece and return a boolean indicating rotation success."""
+
+        rotated_position = self.get_rotated_position(rotation, matrix)
+        if rotated_position is not None:
+            self.position = rotated_position
+            self.orientation = rotate_orientation(self.orientation, rotation)
+            return True
+        return False
+
+    def translate(self, direction: TranslateDirection, matrix: Matrix) -> bool:
+        """Translate the active piece and return a boolean indicating rotation success."""
+
+        translated_position = self.get_translated_position(direction)
+        if not matrix.check_collision(translated_position):
+            self.position = translated_position
+            match direction:
+                case TranslateDirection.LEFT:
+                    self.left_translations += 1
+                case TranslateDirection.RIGHT:
+                    self.right_translations += 1
+                case TranslateDirection.DOWN:
+                    self.down_translations += 1
+            return True
+        return False
 
     @property
     def min_row(self):
@@ -1344,4 +1439,3 @@ def rotate_z_piece_left_well_kick(
 
     new_position = rotate_z_piece_visual(position, orientation, rotation)
     return [(i + kick_i, j + kick_j) for (i, j) in new_position]
-

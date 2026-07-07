@@ -1,6 +1,5 @@
 from collections import deque
 from dataclasses import dataclass
-from enum import Enum, auto
 from random import Random
 from typing import Callable
 
@@ -9,13 +8,6 @@ from piece import (
     ActivePiece,
     Rotation,
     generate_random_bag,
-    rotate_i_piece,
-    rotate_j_piece,
-    rotate_l_piece,
-    rotate_orientation,
-    rotate_s_piece,
-    rotate_t_piece,
-    rotate_z_piece,
 )
 from shared import (
     CONFIG,
@@ -24,13 +16,8 @@ from shared import (
     Observation,
     PieceType,
     RunOutcome,
+    TranslateDirection,
 )
-
-
-class TranslateDirection(Enum):
-    DOWN = auto()
-    LEFT = auto()
-    RIGHT = auto()
 
 
 @dataclass(frozen=True)
@@ -218,113 +205,34 @@ class Engine:
         return ActionResult(True, True)
 
     def fall(self) -> ActionResult:
-        new_position = self.get_active_piece_translation(TranslateDirection.DOWN)
-        if not self.matrix.check_collision(new_position):
-            self.active_piece.position = new_position
-            return ActionResult(True)
-        return ActionResult(False)
+        success = self.active_piece.translate(TranslateDirection.DOWN, self.matrix)
+        return ActionResult(success)
 
     def left_shift(self) -> ActionResult:
-        new_position = self.get_active_piece_translation(TranslateDirection.LEFT)
-        if not self.matrix.check_collision(new_position):
-            self.active_piece.position = new_position
-            return ActionResult(True)
-        return ActionResult(False)
+        success = self.active_piece.translate(TranslateDirection.LEFT, self.matrix)
+        return ActionResult(success)
 
     def right_shift(self) -> ActionResult:
-        new_position = self.get_active_piece_translation(TranslateDirection.RIGHT)
-        if not self.matrix.check_collision(new_position):
-            self.active_piece.position = new_position
-            return ActionResult(True)
-        return ActionResult(False)
+        success = self.active_piece.translate(TranslateDirection.RIGHT, self.matrix)
+        return ActionResult(success)
 
     def soft_drop(self) -> ActionResult:
-        new_position = self.get_active_piece_translation(TranslateDirection.DOWN)
-        if not self.matrix.check_collision(new_position):
-            self.active_piece.position = new_position
-            return ActionResult(True)
-        return ActionResult(False)
+        success = self.active_piece.translate(TranslateDirection.DOWN, self.matrix)
+        return ActionResult(success)
 
     def hard_drop(self) -> ActionResult:
-        while not self.matrix.check_collision(
-            self.get_active_piece_translation(TranslateDirection.DOWN)
-        ):
-            self.active_piece.position = self.get_active_piece_translation(TranslateDirection.DOWN)
+        while self.active_piece.translate(TranslateDirection.DOWN, self.matrix):
+            pass
         self.action_queue.appendleft(Action.LOCK_DOWN)
         return ActionResult(True)
 
-    def get_active_piece_rotated_position(
-        self, rotation: Rotation
-    ) -> tuple[tuple[int, int], ...] | None:
-        match self.active_piece.piece_type:
-            case PieceType.I_PIECE:
-                return rotate_i_piece(
-                    self.matrix,
-                    self.active_piece.position,
-                    self.active_piece.orientation,
-                    rotation,
-                )
-            case PieceType.T_PIECE:
-                return rotate_t_piece(
-                    self.matrix,
-                    self.active_piece.position,
-                    self.active_piece.orientation,
-                    rotation,
-                )
-            case PieceType.L_PIECE:
-                return rotate_l_piece(
-                    self.matrix,
-                    self.active_piece.position,
-                    self.active_piece.orientation,
-                    rotation,
-                )
-            case PieceType.J_PIECE:
-                return rotate_j_piece(
-                    self.matrix,
-                    self.active_piece.position,
-                    self.active_piece.orientation,
-                    rotation,
-                )
-            case PieceType.S_PIECE:
-                return rotate_s_piece(
-                    self.matrix,
-                    self.active_piece.position,
-                    self.active_piece.orientation,
-                    rotation,
-                )
-            case PieceType.Z_PIECE:
-                return rotate_z_piece(
-                    self.matrix,
-                    self.active_piece.position,
-                    self.active_piece.orientation,
-                    rotation,
-                )
-            case PieceType.O_PIECE:
-                return None
-
     def cw_rotate(self) -> ActionResult:
-        new_position = self.get_active_piece_rotated_position(Rotation.CW)
-
-        if new_position is not None:
-            self.active_piece.position = new_position
-            self.active_piece.orientation = rotate_orientation(
-                self.active_piece.orientation, Rotation.CW
-            )
-            return ActionResult(True)
-
-        return ActionResult(False)
+        success = self.active_piece.rotate(Rotation.CW, self.matrix)
+        return ActionResult(success)
 
     def ccw_rotate(self) -> ActionResult:
-        new_position = self.get_active_piece_rotated_position(Rotation.CCW)
-
-        if new_position is not None:
-            self.active_piece.position = new_position
-            self.active_piece.orientation = rotate_orientation(
-                self.active_piece.orientation, Rotation.CCW
-            )
-            return ActionResult(True)
-
-        return ActionResult(False)
+        success = self.active_piece.rotate(Rotation.CCW, self.matrix)
+        return ActionResult(success)
 
     def hold_piece(self) -> ActionResult:
         if self.hold_disabled:
@@ -343,19 +251,8 @@ class Engine:
 
     # --- Utilities ---
 
-    def get_active_piece_translation(
-        self, direction: TranslateDirection
-    ) -> tuple[tuple[int, int], ...]:
-        match direction:
-            case TranslateDirection.DOWN:
-                return tuple((i - 1, j) for (i, j) in self.active_piece.position)
-            case TranslateDirection.LEFT:
-                return tuple((i, j - 1) for (i, j) in self.active_piece.position)
-            case TranslateDirection.RIGHT:
-                return tuple((i, j + 1) for (i, j) in self.active_piece.position)
-
     def surface_contact(self) -> bool:
-        new_position = self.get_active_piece_translation(TranslateDirection.DOWN)
+        new_position = self.active_piece.get_translated_position(TranslateDirection.DOWN)
         return self.matrix.check_collision(new_position)
 
     def build_action_mask(self) -> tuple[bool]:
@@ -367,20 +264,31 @@ class Engine:
         for i, action in enumerate(PLAYER_ACTION_SPACE):
             match action:
                 case Action.LEFT_SHIFT:
-                    new_position = self.get_active_piece_translation(TranslateDirection.LEFT)
+                    new_position = self.active_piece.get_translated_position(
+                        TranslateDirection.LEFT
+                    )
                     mask[i] = not self.matrix.check_collision(new_position)
                 case Action.RIGHT_SHIFT:
-                    new_position = self.get_active_piece_translation(TranslateDirection.LEFT)
+                    new_position = self.active_piece.get_translated_position(
+                        TranslateDirection.RIGHT
+                    )
                     mask[i] = not self.matrix.check_collision(new_position)
                 case Action.SOFT_DROP:
-                    new_position = self.get_active_piece_translation(TranslateDirection.DOWN)
+                    new_position = self.active_piece.get_translated_position(
+                        TranslateDirection.DOWN
+                    )
                     mask[i] = not self.matrix.check_collision(new_position)
                 case Action.HARD_DROP:
                     mask[i] = True
                 case Action.CW_ROTATE:
-                    mask[i] = self.get_active_piece_rotated_position(Rotation.CW) is not None
+                    mask[i] = (
+                        self.active_piece.get_rotated_position(Rotation.CW, self.matrix) is not None
+                    )
                 case Action.CCW_ROTATE:
-                    mask[i] = self.get_active_piece_rotated_position(Rotation.CCW) is not None
+                    mask[i] = (
+                        self.active_piece.get_rotated_position(Rotation.CCW, self.matrix)
+                        is not None
+                    )
                 case Action.HOLD:
                     mask[i] = not self.hold_disabled
 
@@ -408,4 +316,8 @@ class Engine:
             lock_down_resets_remaining=lock_down_resets_remaining,
             lines_cleared=self.matrix.lines_cleared,
             run_outcome=self.run_outcome,
+            active_piece_rotation_count=self.active_piece.rotations,
+            active_piece_left_translations=self.active_piece.left_translations,
+            active_piece_right_translations=self.active_piece.right_translations,
+            active_piece_down_translations=self.active_piece.down_translations,
         )
