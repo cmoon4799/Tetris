@@ -1,12 +1,17 @@
-import os
+import json
+from pathlib import Path
 
-import pygame
 import pytest
 
 from matrix import Matrix
 from piece import ActivePiece, Rotation, rotate_orientation
-from render import Renderer
 from shared import CONFIG, Color, Observation, PieceOrientation, PieceType
+
+LAYOUT_FILE = Path(__file__).parent / "fixtures" / "render_layouts.json"
+LAYOUT_SYMBOL_TO_COLOR: dict[str, Color | None] = {
+    ".": None,
+    "#": Color.DARK_BLUE,
+}
 
 
 def make_matrix() -> Matrix:
@@ -14,6 +19,62 @@ def make_matrix() -> Matrix:
         matrix_width=CONFIG.matrix_width,
         matrix_height=(CONFIG.matrix_height + CONFIG.buffer_height),
     )
+
+
+def generate_observation(matrix, active_piece: ActivePiece) -> Observation:
+    return Observation(
+        matrix=matrix.snapshot(),
+        active_piece_type=active_piece.piece_type,
+        active_piece_position=active_piece.position,
+        active_piece_orientation=active_piece.orientation,
+        held_piece=None,
+        hold_disabled=True,
+        action_mask=tuple(False for _ in range(7)),
+        piece_queue=tuple(PieceType.I_PIECE for _ in range(CONFIG.visible_queue_size)),
+        gravity_frames_remaining=0,
+        lock_down_active=False,
+        lock_down_frames_remaining=0,
+        lock_down_resets_remaining=0,
+        lines_cleared=0,
+        run_outcome=None,
+        active_piece_rotations=0,
+        active_piece_left_translations=0,
+        active_piece_right_translations=0,
+        active_piece_down_translations=0,
+        active_piece_left_shifted=False,
+        active_piece_right_shifted=False,
+    )
+
+
+def load_layout_rows(layout_name: str) -> list[str]:
+    with LAYOUT_FILE.open("r", encoding="utf-8") as f:
+        layouts = json.load(f)
+
+    if layout_name not in layouts:
+        raise ValueError(f"Unknown layout '{layout_name}' in {LAYOUT_FILE}")
+
+    rows = layouts[layout_name]["rows"]
+    if not isinstance(rows, list) or not rows:
+        raise ValueError(f"Layout '{layout_name}' must contain non-empty 'rows'.")
+
+    return rows
+
+
+def apply_layout_to_matrix(matrix: Matrix, rows: list[str]) -> None:
+    for row, row_text in enumerate(rows):
+        if len(row_text) != CONFIG.matrix_width:
+            raise ValueError(
+                f"Layout row width mismatch at row {row}; expected {CONFIG.matrix_width}, got {len(row_text)}"
+            )
+
+        matrix_row = len(rows) - 1 - row
+
+        for col, symbol in enumerate(row_text):
+            if symbol not in LAYOUT_SYMBOL_TO_COLOR:
+                raise ValueError(f"Unknown symbol '{symbol}' at ({row}, {col}) in layout")
+            color = LAYOUT_SYMBOL_TO_COLOR[symbol]
+            if color is not None:
+                matrix[matrix_row][col] = color
 
 
 def test_rotate_orientation_cycles_back_after_four_cw_turns() -> None:
@@ -109,46 +170,16 @@ def test_cw_then_ccw_returns_piece_to_start(piece_type: PieceType) -> None:
     assert piece.orientation == start_orientation
 
 
-def test_random():
-    if os.getenv("TETRIS_TINKER_RENDER") != "1":
-        pytest.skip("Set TETRIS_TINKER_RENDER=1 to run interactive render tinker test")
-
+def test_l_spin():
     matrix = make_matrix()
-    for col in range(CONFIG.matrix_width):
-        matrix[0][col] = Color.DARK_BLUE
+    layout_rows = load_layout_rows("l_spin_well")
+    apply_layout_to_matrix(matrix, layout_rows)
 
-    renderer = Renderer()
-    observation = Observation(
-        matrix=matrix.snapshot(),
-        active_piece_type=PieceType.L_PIECE,
-        active_piece_position=((20, 5), (19, 5), (18, 5), (18, 6)),
-        active_piece_orientation=PieceOrientation.NORTH,
-        held_piece=None,
-        hold_disabled=True,
-        action_mask=tuple(False for _ in range(7)),
-        piece_queue=tuple(PieceType.I_PIECE for _ in range(CONFIG.visible_queue_size)),
-        gravity_frames_remaining=0,
-        lock_down_active=False,
-        lock_down_frames_remaining=0,
-        lock_down_resets_remaining=0,
-        lines_cleared=0,
-        run_outcome=None,
-        active_piece_rotations=0,
-        active_piece_left_translations=0,
-        active_piece_right_translations=0,
-        active_piece_down_translations=0,
-        active_piece_left_shifted=False,
-        active_piece_right_shifted=False,
-    )
+    active_piece = ActivePiece(piece_type=PieceType.L_PIECE)
+    active_piece.orientation = PieceOrientation.WEST
+    active_piece.position = ((7, 7), (7, 8), (6, 8), (5, 8))
 
-    clock = pygame.time.Clock()
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
+    active_piece.rotate(Rotation.CW, matrix=matrix)
+    active_piece.rotate(Rotation.CW, matrix=matrix)
 
-        renderer.render(observation)
-        clock.tick(CONFIG.fps)
-
-    pygame.quit()
+    assert set(active_piece.position) == set(((2, 6), (2, 7), (3, 6), (4, 6)))
