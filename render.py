@@ -1,11 +1,10 @@
 import pygame
 
-from engine import Engine
 from piece import (
     PIECE_TO_COLOR_MAP,
     generate_anchor_relative_position,
 )
-from shared import CONFIG, Color, PieceOrientation, PieceType
+from shared import CONFIG, Color, Observation, PieceOrientation, PieceType
 
 
 class Renderer:
@@ -19,6 +18,7 @@ class Renderer:
     VISIBLE_QUEUE_SIZE = CONFIG.visible_queue_size
     MATRIX_HEIGHT = CONFIG.matrix_height
     MATRIX_WIDTH = CONFIG.matrix_width
+    BUFFER_HEIGHT = CONFIG.buffer_height
 
     COLOR_MAP = {
         Color.YELLOW: (255, 255, 0),
@@ -33,9 +33,7 @@ class Renderer:
         Color.PINK: (255, 192, 203),
     }
 
-    def __init__(self, engine: Engine):
-        self.engine = engine
-
+    def __init__(self):
         # the rendered space takes the following form
         # * A * B * C *
         # where A, B, C are the held piece, matrix, queue respectively and * represents the
@@ -49,17 +47,17 @@ class Renderer:
         window_height = (self.MATRIX_HEIGHT + self.TOP_MARGIN + self.BOTTOM_MARGIN) * self.CELL_SIZE
         self.screen = pygame.display.set_mode((window_width, window_height))
 
-    def render(self) -> None:
+    def render(self, observation: Observation) -> None:
         self.screen.fill(self.COLOR_MAP[Color.BLACK])
 
-        self.render_held_piece()
-        self.render_matrix()
-        self.render_active_piece()
-        self.render_queue()
+        self.render_held_piece(observation)
+        self.render_matrix(observation)
+        self.render_active_piece(observation)
+        self.render_queue(observation)
 
         pygame.display.flip()
 
-    def render_held_piece(self) -> None:
+    def render_held_piece(self, observation: Observation) -> None:
         """Render the held piece in its framing rectangle."""
 
         # render framing rectangle
@@ -73,12 +71,13 @@ class Renderer:
         pygame.draw.rect(self.screen, self.COLOR_MAP[Color.CYAN], held_piece_rectangle, width=1)
 
         # render piece
-        self.render_framed_piece(self.engine.held_piece, (offset_x, offset_y))
+        self.render_framed_piece(observation.held_piece, (offset_x, offset_y))
 
     def render_framed_piece(self, piece_type: PieceType | None, offset: tuple[int, int]) -> None:
         """Render a piece in its North orientation centered in a 5 by 3 rectangle. Without any
         offset, these cells will be drawn in the top left corner of the pygame screen.
         """
+
         if piece_type is None:
             return
 
@@ -110,34 +109,35 @@ class Renderer:
             cell = pygame.Rect(x + offset_x, y + offset_y, self.CELL_SIZE, self.CELL_SIZE)
             pygame.draw.rect(self.screen, color, cell)
 
-    def render_matrix(self) -> None:
+    def render_matrix(self, observation: Observation) -> None:
         """Render the game matrix and active piece."""
+
         matrix_anchor_x, matrix_anchor_y = (self.FRAMED_PIECE_WIDTH + 2, self.TOP_MARGIN)
-        for i in range(self.MATRIX_HEIGHT + self.engine.BUFFER_HEIGHT):
+        for i in range(self.MATRIX_HEIGHT + self.BUFFER_HEIGHT):
             for j in range(self.MATRIX_WIDTH):
                 x = (j + matrix_anchor_x) * self.CELL_SIZE
                 y = (self.MATRIX_HEIGHT - 1 - i + matrix_anchor_y) * self.CELL_SIZE
 
                 cell = pygame.Rect(x, y, self.CELL_SIZE, self.CELL_SIZE)
-                if self.engine.matrix[i][j]:
-                    color = self.COLOR_MAP[self.engine.matrix[i][j]]
+                if observation.matrix[i][j]:
+                    color = self.COLOR_MAP[observation.matrix[i][j]]
                     pygame.draw.rect(self.screen, color, cell)
                 if i < self.MATRIX_HEIGHT:
                     pygame.draw.rect(self.screen, self.COLOR_MAP[Color.CYAN], cell, width=1)
 
-    def render_active_piece(self) -> None:
+    def render_active_piece(self, observation: Observation) -> None:
         matrix_anchor_x, matrix_anchor_y = (self.FRAMED_PIECE_WIDTH + 2, self.TOP_MARGIN)
-        for i, j in self.engine.active_piece.position:
+        for i, j in observation.active_piece_position:
             x = (j + matrix_anchor_x) * self.CELL_SIZE
             y = (self.MATRIX_HEIGHT - 1 - i + matrix_anchor_y) * self.CELL_SIZE
 
             cell = pygame.Rect(x, y, self.CELL_SIZE, self.CELL_SIZE)
-            # color = self.COLOR_MAP[self.engine.active_piece.color]
-            color = self.COLOR_MAP[Color.PINK]
+            color = self.COLOR_MAP[PIECE_TO_COLOR_MAP[observation.active_piece_type]]
             pygame.draw.rect(self.screen, color, cell)
 
-    def render_queue(self) -> None:
+    def render_queue(self, observation: Observation) -> None:
         """Render the piece preview queue."""
+
         offset_x = (3 + self.FRAMED_PIECE_WIDTH + self.MATRIX_WIDTH) * self.CELL_SIZE
         offset_y = self.TOP_MARGIN * self.CELL_SIZE
         queue_height = self.FRAMED_PIECE_HEIGHT * self.CELL_SIZE * self.VISIBLE_QUEUE_SIZE
@@ -146,8 +146,9 @@ class Renderer:
 
         pygame.draw.rect(self.screen, self.COLOR_MAP[Color.CYAN], queue_rectangle, width=1)
 
-        for i in range(self.VISIBLE_QUEUE_SIZE):
+        visible_count = min(self.VISIBLE_QUEUE_SIZE, len(observation.piece_queue))
+        for i in range(visible_count):
             self.render_framed_piece(
-                piece_type=self.engine.piece_queue[i],
+                piece_type=observation.piece_queue[i],
                 offset=(offset_x, offset_y + self.FRAMED_PIECE_HEIGHT * self.CELL_SIZE * i),
             )

@@ -10,11 +10,12 @@ if __name__ == "__main__":
     clock = pygame.time.Clock()
 
     engine = Engine()
-    renderer = Renderer(engine=engine)
+    renderer = Renderer()
     input_manager = PygameInputManager()
 
     while engine.running:
-        renderer.render()
+        observation = engine.build_observation()
+        renderer.render(observation)
         actions = input_manager.poll()
         engine.process_frame(actions)
 
