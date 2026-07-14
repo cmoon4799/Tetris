@@ -36,6 +36,19 @@ class Engine:
     LOCK_DOWN_SPEED = CONFIG.lock_down_speed
     LOCK_DOWN_RESET_LIMIT = CONFIG.lock_down_reset_limit
 
+    MOVEMENT_ACTIONS = {
+        Action.RIGHT_SHIFT,
+        Action.LEFT_SHIFT,
+        Action.SOFT_DROP,
+        Action.HARD_DROP,
+        Action.CW_ROTATE,
+        Action.CCW_ROTATE,
+    }
+    RESTRICTED_ACTIONS = {
+        Action.FALL,
+        Action.LOCK_DOWN,
+    }
+
     def __init__(
         self,
         seed: int | None = None,
@@ -76,14 +89,6 @@ class Engine:
             Action.FALL: self.fall,
             Action.LOCK_DOWN: self.lock_down,
         }
-        self.MOVEMENT_ACTIONS = {
-            Action.RIGHT_SHIFT,
-            Action.LEFT_SHIFT,
-            Action.SOFT_DROP,
-            Action.HARD_DROP,
-            Action.CW_ROTATE,
-            Action.CCW_ROTATE,
-        }
 
         self.running = True
         self.run_outcome: RunOutcome | None = None
@@ -91,7 +96,7 @@ class Engine:
 
     def process_frame(self, actions: list[Action]) -> None:
         for action in actions:
-            if not isinstance(action, Action) or action.restricted:
+            if not isinstance(action, Action) or action in self.RESTRICTED_ACTIONS:
                 raise ValueError(f"Provided input {action} is not a valid player action.")
 
         self.frame_ticks += 1
@@ -209,10 +214,14 @@ class Engine:
         return ActionResult(success)
 
     def left_shift(self) -> ActionResult:
+        if self.active_piece.right_shifted:
+            print("left shifting when right shifted")
         success = self.active_piece.translate(TranslateDirection.LEFT, self.matrix)
         return ActionResult(success)
 
     def right_shift(self) -> ActionResult:
+        if self.active_piece.left_shifted:
+            print("right shifting when left shifted")
         success = self.active_piece.translate(TranslateDirection.RIGHT, self.matrix)
         return ActionResult(success)
 
@@ -264,11 +273,17 @@ class Engine:
         for i, action in enumerate(PLAYER_ACTION_SPACE):
             match action:
                 case Action.LEFT_SHIFT:
+                    if self.active_piece.right_shifted:
+                        mask[i] = False
+                        continue
                     new_position = self.active_piece.get_translated_position(
                         TranslateDirection.LEFT
                     )
                     mask[i] = not self.matrix.check_collision(new_position)
                 case Action.RIGHT_SHIFT:
+                    if self.active_piece.left_shifted:
+                        mask[i] = False
+                        continue
                     new_position = self.active_piece.get_translated_position(
                         TranslateDirection.RIGHT
                     )
@@ -281,10 +296,22 @@ class Engine:
                 case Action.HARD_DROP:
                     mask[i] = True
                 case Action.CW_ROTATE:
+                    if (
+                        self.active_piece.piece_type == PieceType.O_PIECE
+                        or self.active_piece.rotations == 4
+                    ):
+                        mask[i] = False
+                        continue
                     mask[i] = (
                         self.active_piece.get_rotated_position(Rotation.CW, self.matrix) is not None
                     )
                 case Action.CCW_ROTATE:
+                    if (
+                        self.active_piece.piece_type == PieceType.O_PIECE
+                        or self.active_piece.rotations == 4
+                    ):
+                        mask[i] = False
+                        continue
                     mask[i] = (
                         self.active_piece.get_rotated_position(Rotation.CCW, self.matrix)
                         is not None
@@ -316,8 +343,10 @@ class Engine:
             lock_down_resets_remaining=lock_down_resets_remaining,
             lines_cleared=self.matrix.lines_cleared,
             run_outcome=self.run_outcome,
-            active_piece_rotation_count=self.active_piece.rotations,
+            active_piece_rotations=self.active_piece.rotations,
             active_piece_left_translations=self.active_piece.left_translations,
             active_piece_right_translations=self.active_piece.right_translations,
             active_piece_down_translations=self.active_piece.down_translations,
+            active_piece_left_shifted=self.active_piece.left_shifted,
+            active_piece_right_shifted=self.active_piece.right_shifted,
         )

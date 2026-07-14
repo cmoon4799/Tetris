@@ -3,6 +3,7 @@ Implemented using the 2009 Tetris Design Guideline
 ## TODO
 
 ### High Priority
+- First test destination DQN on final destination approach.
 - Add a finite lock down reset cap.
 - Add tests for spawn validity and collision constraints.
 - Inject seeded RNG into piece generation so identical seeds and actions reproduce identical runs.

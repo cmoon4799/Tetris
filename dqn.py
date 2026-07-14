@@ -1,5 +1,6 @@
 import os
 import random
+import time
 from collections import deque
 from typing import NamedTuple, Sequence
 
@@ -38,6 +39,8 @@ ORIENTATION_TO_INDEX = {
     PieceOrientation.SOUTH: 2,
     PieceOrientation.WEST: 3,
 }
+
+ROTATIONS_LIMIT = 4
 
 DQN_PT_FILEPATH = "tetris_dqn.pt"
 
@@ -116,6 +119,24 @@ class ReplayBuffer:
             next_action_masks=torch.stack(next_action_masks),
         )
 
+    def to_cpu(self) -> None:
+        self.buffer = deque(
+            (
+                Transition(
+                    spatial=t.spatial.cpu(),
+                    flat=t.flat.cpu(),
+                    action=t.action,
+                    reward=t.reward,
+                    terminated=t.terminated,
+                    next_spatial=t.next_spatial.cpu(),
+                    next_flat=t.next_flat.cpu(),
+                    next_action_mask=t.next_action_mask.cpu(),
+                )
+                for t in self.buffer
+            ),
+            maxlen=self.buffer.maxlen,
+        )
+
     def __len__(self) -> int:
         return len(self.buffer)
 
@@ -128,18 +149,25 @@ class DQN(nn.Module):
     LOCK_DOWN_SPEED = CONFIG.lock_down_speed
     LOCK_DOWN_RESET_LIMIT = CONFIG.lock_down_reset_limit
 
-    FLAT_FEATURE_DIMENSION = 73
-    SPATIAL_FEATURE_DIMENSION = 2 * MATRIX_HEIGHT * MATRIX_WIDTH
+    FLAT_FEATURE_DIMENSION = 76
 
     def __init__(self, gamma: float = 0.99):
         super().__init__()
         self.gamma = gamma
 
         # channel 1 represents the matrix; channel 2 represents the active piece position
-        self.convolution = nn.Conv2d(in_channels=2, out_channels=16, kernel_size=3, padding=1)
-        convolution_dimension = 16 * self.MATRIX_HEIGHT * self.MATRIX_WIDTH
+        self.convolution = nn.Sequential(
+            nn.Conv2d(2, 16, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(16, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(32, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Flatten(),
+        )
+        convolution_dimension = 32 * self.MATRIX_HEIGHT * self.MATRIX_WIDTH
 
-        spatial_dimension = 128
+        spatial_dimension = 256
         flat_dimension = 32
         self.spatial_fc = nn.Linear(convolution_dimension, spatial_dimension)
         self.flat_fc = nn.Linear(self.FLAT_FEATURE_DIMENSION, flat_dimension)
@@ -160,15 +188,12 @@ class DQN(nn.Module):
         if flat_tensor.dim() != expected_flat_tensor_dim:
             raise ValueError(
                 f"""
-                Unexpected spatial tensor dimension.
+                Unexpected flat tensor dimension.
                 Expected {expected_flat_tensor_dim} but got {flat_tensor.dim()}.
                 """
             )
 
-        # shape (16, MATRIX_HEIGHT, MATRIX_WIDTH)
-        x_spatial = F.relu(self.convolution(spatial_tensor))
-        # flatten into (batch_size, 16 * MATRIX_HEIGHT * MATRIX_WIDTH)
-        x_spatial = x_spatial.view(x_spatial.size(0), -1)
+        x_spatial = self.convolution(spatial_tensor)
         x_spatial_features = F.relu(self.spatial_fc(x_spatial))
 
         x_flat_features = F.relu(self.flat_fc(flat_tensor))
@@ -258,11 +283,15 @@ class DQNAgent:
         max_gravity = CONFIG.gravity_speed * CONFIG.fps
         max_lockdown = CONFIG.lock_down_speed * CONFIG.fps
         max_resets = CONFIG.lock_down_reset_limit
+        ROTATIONS_LIMIT = 4
 
         flat_features.append(torch.tensor([observation.gravity_frames_remaining / max_gravity]))
         flat_features.append(torch.tensor([float(observation.lock_down_active)]))
         flat_features.append(torch.tensor([observation.lock_down_frames_remaining / max_lockdown]))
         flat_features.append(torch.tensor([observation.lock_down_resets_remaining / max_resets]))
+        flat_features.append(torch.tensor([observation.active_piece_rotations / ROTATIONS_LIMIT]))
+        flat_features.append(torch.tensor([float(observation.active_piece_left_shifted)]))
+        flat_features.append(torch.tensor([float(observation.active_piece_right_shifted)]))
 
         flat_tensor = torch.cat(flat_features).float()
 
@@ -331,30 +360,6 @@ class DQNAgent:
 
         return loss.item()
 
-    def save_checkpoint(self, filepath: str) -> None:
-        checkpoint = {
-            "model_state_dict": self.model.state_dict(),
-            "target_model_state_dict": self.target_model.state_dict(),
-            "optimizer_state_dict": self.optimizer.state_dict(),
-            "steps": self.steps,
-        }
-        torch.save(checkpoint, filepath)
-        print(f"Checkpoint saved to {filepath}!")
-
-    def load_checkpoint(self, filepath: str) -> None:
-        if not os.path.exists(filepath):
-            print(f"No checkpoint found at {filepath}. Starting from scratch.")
-            return
-
-        checkpoint = torch.load(filepath, map_location=self.device)
-
-        self.model.load_state_dict(checkpoint["model_state_dict"])
-        self.target_model.load_state_dict(checkpoint["target_model_state_dict"])
-        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        self.steps = checkpoint["steps"]
-
-        print(f"Successfully loaded checkpoint from {filepath}. Resuming from step {self.steps}!")
-
 
 class Trainer:
     def __init__(
@@ -371,10 +376,12 @@ class Trainer:
         self.epsilon = 1.0
         self.epsilon_decay = 0.995
         self.min_epsilon = 0.01
-        self.save_frequency = 100
+        self.save_frequency = 20
+
+        self.episode = 0
 
     def train(self):
-        for episode in range(self.max_episodes):
+        while self.episode < self.max_episodes:
             engine = Engine(self.seed)
 
             observation = engine.build_observation()
@@ -382,11 +389,7 @@ class Trainer:
             flat = self.agent.tensorize_flat_features(observation)
             action_mask = torch.tensor(observation.action_mask, dtype=torch.bool)
 
-            episode_losses = []
-            if episode > 0 and episode % 100 == 0:
-                renderer = Renderer(engine=engine)
-            else:
-                renderer = None
+            renderer = Renderer(engine=engine)
 
             while engine.running:
                 if renderer is not None:
@@ -401,11 +404,14 @@ class Trainer:
                 next_flat = self.agent.tensorize_flat_features(next_observation)
                 next_action_mask = torch.tensor(next_observation.action_mask, dtype=torch.bool)
 
+                reward = self.compute_reward(observation, next_observation, action)
+                print(reward)
+
                 self.agent.replay_buffer.push(
                     spatial=spatial,
                     flat=flat,
                     action=action,
-                    reward=self.compute_reward(observation, next_observation),
+                    reward=reward,
                     terminated=next_observation.run_outcome is not None,
                     next_spatial=next_spatial,
                     next_flat=next_flat,
@@ -419,45 +425,149 @@ class Trainer:
                     next_observation,
                 )
 
-                loss = self.agent.train_step(self.batch_size)
-                if loss is not None:
-                    episode_losses.append(loss)
+                self.agent.train_step(self.batch_size)
 
-            average_loss = sum(episode_losses) / len(episode_losses) if episode_losses else 0
+                time.sleep(0.05)
+
             print(
                 f"""
-                Episode: {episode}
+                Episode: {self.episode}
                     Outcome: {observation.run_outcome.name}
                     Lines Cleared: {observation.lines_cleared}
                     Epsilon: {self.epsilon}
-                    Average Loss: {average_loss:.4f}
                 """
             )
 
-            if episode > 0 and episode % self.save_frequency == 0:
-                self.agent.save_checkpoint(DQN_PT_FILEPATH)
+            if self.episode > 0 and self.episode % self.save_frequency == 0:
+                self.save_checkpoint(DQN_PT_FILEPATH)
 
             self.epsilon = max(0.01, self.epsilon * 0.995)
+            self.episode += 1
 
-    def compute_reward(self, observation1: Observation, observation2: Observation) -> float:
-        wlc = 1  # weight for lines cleared
-        whd = 3.5  # weight for holes delta
-        victory_reward = 20
-        defeat_penalty = 10
+    def save_checkpoint(self, filepath: str) -> None:
+        checkpoint = {
+            "model_state_dict": self.agent.model.state_dict(),
+            "target_model_state_dict": self.agent.target_model.state_dict(),
+            "optimizer_state_dict": self.agent.optimizer.state_dict(),
+            "replay_buffer": self.agent.replay_buffer,
+            "epsilon": self.epsilon,
+            "episode": self.episode,
+            "steps": self.agent.steps,
+        }
+        torch.save(checkpoint, filepath)
+        print(f"Checkpoint saved to {filepath}!")
+
+    def load_checkpoint(self, filepath: str) -> None:
+        if not os.path.exists(filepath):
+            print(f"No checkpoint found at {filepath}. Starting from scratch.")
+            return
+
+        checkpoint = torch.load(filepath, map_location=self.agent.device, weights_only=False)
+
+        self.agent.model.load_state_dict(checkpoint["model_state_dict"])
+        self.agent.target_model.load_state_dict(checkpoint["target_model_state_dict"])
+        self.agent.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        self.agent.replay_buffer = checkpoint["replay_buffer"]
+        self.agent.replay_buffer.to_cpu()
+        self.agent.steps = checkpoint["steps"]
+        self.episode = checkpoint["episode"]
+        self.epsilon = checkpoint["epsilon"]
+
+        print(
+            f"Successfully loaded checkpoint from {filepath}. Resuming from step {self.agent.steps}!"
+        )
+
+    def compute_reward(
+        self,
+        observation1: Observation,
+        observation2: Observation,
+        action: Action,
+        should_print: bool = False,
+    ) -> float:
+        w_lines_cleared = self.get_lines_cleared_weight()
+        w_holes = 3.0
+        w_spike = 0.2
+        w_bump = 0.05
+        w_max_height = 0.5
+        victory_reward = 50.0
+        defeat_penalty = 50.0
+
+        reward = 0
 
         lines_cleared = observation2.lines_cleared - observation1.lines_cleared
+        reward += w_lines_cleared * lines_cleared**2
+        print("lines cleared reward: ", w_lines_cleared * lines_cleared**2)
+
         holes1 = self.compute_holes(observation1.matrix)
         holes2 = self.compute_holes(observation2.matrix)
-        holes_delta = holes2 - holes1
+        reward -= w_holes * (holes2 - holes1)
+        print("holes penalty: ", w_holes * (holes2 - holes1))
 
-        base_reward = wlc * lines_cleared**2 - whd * holes_delta
+        spike1 = self.compute_spikiness(observation1.matrix)
+        spike2 = self.compute_spikiness(observation2.matrix)
+        reward -= w_spike * (spike2 - spike1)
+        print("spikes penalty: ", w_spike * (spike2 - spike1))
+
+        bump1 = self.compute_bumpiness(observation1.matrix)
+        bump2 = self.compute_bumpiness(observation2.matrix)
+        reward -= w_bump * (bump2 - bump1)
+        print("bump penalty: ", w_bump * (bump2 - bump1))
+
+        max_height1 = self.compute_max_height(observation1.matrix)
+        max_height2 = self.compute_max_height(observation2.matrix)
+        reward -= w_max_height * (max_height2 - max_height1)
+        print("max height penalty: ", w_max_height * (max_height2 - max_height1))
+
+        print("total: ", reward)
 
         if observation2.run_outcome == RunOutcome.VICTORY:
-            return base_reward + victory_reward
+            return reward + victory_reward
         if observation2.run_outcome == RunOutcome.DEFEAT:
-            return base_reward - defeat_penalty
+            return reward - defeat_penalty
 
-        return base_reward
+        return reward
+
+    def get_lines_cleared_weight(self):
+        start = 20
+        end = 2
+        decay_episodes = 1000
+
+        t = min(1.0, self.episode / decay_episodes)
+
+        return start + t * (end - start)
+
+    def get_column_height(self, matrix: Sequence[Sequence[Color | None]], column: int) -> int:
+        height = len(matrix)
+        for i in range(height - 1, -1, -1):
+            if matrix[i][column] is not None:
+                return i + 1
+
+        return 0
+
+    def compute_bumpiness(self, matrix: Sequence[Sequence[Color | None]]) -> int:
+        width = len(matrix[0])
+
+        bumpiness = 0
+        for j in range(width - 1):
+            h2 = self.get_column_height(matrix, j + 1)
+            h1 = self.get_column_height(matrix, j)
+            bumpiness += abs(h2 - h1)
+
+        return bumpiness
+
+    def compute_spikiness(self, matrix: Sequence[Sequence[Color | None]]) -> float:
+        width = len(matrix[0])
+
+        heights = [self.get_column_height(matrix, column) for column in range(width)]
+        max_height = max(heights)
+        average_height = sum(heights) / width
+
+        return max_height - average_height
+
+    def compute_max_height(self, matrix: Sequence[Sequence[Color | None]]) -> int:
+        width = len(matrix[0])
+        heights = [self.get_column_height(matrix, column) for column in range(width)]
+        return max(heights)
 
     def compute_holes(self, matrix: Sequence[Sequence[Color | None]]) -> int:
         holes = 0
@@ -477,7 +587,7 @@ class Trainer:
 
 if __name__ == "__main__":
     agent = DQNAgent()
-    agent.load_checkpoint(DQN_PT_FILEPATH)
-    trainer = Trainer(agent=agent)
+    trainer = Trainer(agent=agent, max_episodes=1_000_000)
+    trainer.load_checkpoint(DQN_PT_FILEPATH)
 
     trainer.train()

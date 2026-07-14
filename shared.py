@@ -3,27 +3,18 @@ from enum import Enum, auto
 
 
 class Action(Enum):
-    restricted: bool
-    value: int
-
-    def __init__(self, value: int, restricted: bool):
-        # whether the action is player restricted; playerinput may only derive from
-        # non restricted Actions
-        self._value_ = value
-        self.restricted = restricted
-
     # -- Player Input Actions --
-    LEFT_SHIFT = (0, False)
-    RIGHT_SHIFT = (1, False)
-    SOFT_DROP = (2, False)
-    HARD_DROP = (3, False)
-    CW_ROTATE = (4, False)
-    CCW_ROTATE = (5, False)
-    HOLD = (6, False)
+    LEFT_SHIFT = 0
+    RIGHT_SHIFT = 1
+    SOFT_DROP = 2
+    HARD_DROP = 3
+    CW_ROTATE = 4
+    CCW_ROTATE = 5
+    HOLD = 6
 
     # -- Engine Actions --
-    FALL = (99, True)
-    LOCK_DOWN = (100, True)
+    FALL = 99
+    LOCK_DOWN = 100
 
 
 PLAYER_ACTION_SPACE = (
@@ -125,3 +116,15 @@ class Observation:
     lock_down_resets_remaining: int
     lines_cleared: int
     run_outcome: RunOutcome | None
+    active_piece_rotations: int
+    active_piece_left_translations: int
+    active_piece_right_translations: int
+    active_piece_down_translations: int
+    active_piece_left_shifted: bool
+    active_piece_right_shifted: bool
+
+
+class TranslateDirection(Enum):
+    DOWN = auto()
+    LEFT = auto()
+    RIGHT = auto()

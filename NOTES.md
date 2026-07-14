@@ -11,4 +11,9 @@ When the network samples a batch from memory to learn, it updates its $Q$-values
 Storing memory in a replay buffer
 It is curious as to why we store *next_spatial* and *next_flat* if this data is only to be repeated in the subsequent state. That is, if $s \rightarrow s'$ then $s_{\textit{next\_spatial}} = s'_{\textit{spatial}}$. One reason is for **parallel GPU slicing**. With a linked list or index pointer system, gathering batches requires the CPU to traverse memory pointers or calculate index offsets.
 
+- In standard DQN, the target calculation uses a blind max over the target network's outputs, which causes it to constantly overestimate $Q$-values because it always takes the noisiness/max of the same network.
+
 When updating $Q$ values am i using previous $Q$ or updated $Q$?
+
+Perhaps by restricting the form we can shape behavior. For example, we don't need to left shift immediately after right shifting. We don't have to rotate more than 4 times. 
+

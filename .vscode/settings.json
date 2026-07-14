@@ -7,5 +7,6 @@
   "editor.codeActionsOnSave": {
     "source.organizeImports": "explicit",
     "source.fixAll.ruff": "explicit"
-  }
+  },
+  "python-envs.defaultEnvManager": "ms-python.python:system"
 }

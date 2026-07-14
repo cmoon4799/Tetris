@@ -42,6 +42,12 @@ class ActivePiece:
         self.right_translations = 0
         self.down_translations = 0
 
+        # these flags are used to penalize useless stuttering, i.e. back and
+        # forth movement that causes the piece to stay in place;  it is reset
+        # on every translation
+        self.left_shifted: bool = False
+        self.right_shifted: bool = False
+
     def load_starting_position(self):
         spawn_row = CONFIG.matrix_height
         left_spawn_col = CONFIG.matrix_width // 2 - 2
@@ -159,23 +165,32 @@ class ActivePiece:
     def rotate(self, rotation: Rotation, matrix: Matrix) -> bool:
         """Rotate the active piece and return a boolean indicating rotation success."""
 
+        self.left_shifted = False
+        self.right_shifted = False
+
         rotated_position = self.get_rotated_position(rotation, matrix)
         if rotated_position is not None:
             self.position = rotated_position
             self.orientation = rotate_orientation(self.orientation, rotation)
+            self.rotations += 1
             return True
         return False
 
     def translate(self, direction: TranslateDirection, matrix: Matrix) -> bool:
         """Translate the active piece and return a boolean indicating rotation success."""
 
+        self.left_shifted = False
+        self.right_shifted = False
+
         translated_position = self.get_translated_position(direction)
         if not matrix.check_collision(translated_position):
             self.position = translated_position
             match direction:
                 case TranslateDirection.LEFT:
+                    self.left_shifted = True
                     self.left_translations += 1
                 case TranslateDirection.RIGHT:
+                    self.right_shifted = True
                     self.right_translations += 1
                 case TranslateDirection.DOWN:
                     self.down_translations += 1
