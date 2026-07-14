@@ -1,10 +1,13 @@
 import json
+import os
 from pathlib import Path
 
+import pygame
 import pytest
 
 from matrix import Matrix
 from piece import ActivePiece, Rotation, rotate_orientation
+from render import Renderer
 from shared import CONFIG, Color, Observation, PieceOrientation, PieceType
 
 LAYOUT_FILE = Path(__file__).parent / "fixtures" / "render_layouts.json"
@@ -22,6 +25,8 @@ def make_matrix() -> Matrix:
 
 
 def generate_observation(matrix, active_piece: ActivePiece) -> Observation:
+    """Generate a dummy observation for the renderer for purely visual purposes."""
+
     return Observation(
         matrix=matrix.snapshot(),
         active_piece_type=active_piece.piece_type,
@@ -44,6 +49,44 @@ def generate_observation(matrix, active_piece: ActivePiece) -> Observation:
         active_piece_left_shifted=False,
         active_piece_right_shifted=False,
     )
+
+
+def maybe_visualize_rotation(
+    matrix: Matrix,
+    active_piece: ActivePiece,
+    rotation_sequence: list[Rotation],
+) -> None:
+    if os.getenv("TETRIS_TINKER_RENDER") != "1":
+        for rotation in rotation_sequence:
+            active_piece.rotate(rotation, matrix=matrix)
+        return
+
+    pygame.init()
+    renderer = Renderer()
+    clock = pygame.time.Clock()
+
+    rotation_queue = list(rotation_sequence)
+    last_rotation_tick = pygame.time.get_ticks()
+    running = True
+
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+        renderer.render(generate_observation(matrix, active_piece))
+
+        now = pygame.time.get_ticks()
+        if rotation_queue and now - last_rotation_tick >= 500:
+            active_piece.rotate(rotation_queue.pop(0), matrix=matrix)
+            last_rotation_tick = now
+
+        clock.tick(CONFIG.fps)
+
+    for rotation in rotation_queue:
+        active_piece.rotate(rotation, matrix=matrix)
+
+    pygame.quit()
 
 
 def load_layout_rows(layout_name: str) -> list[str]:
@@ -178,8 +221,51 @@ def test_l_spin():
     active_piece = ActivePiece(piece_type=PieceType.L_PIECE)
     active_piece.orientation = PieceOrientation.WEST
     active_piece.position = ((7, 7), (7, 8), (6, 8), (5, 8))
+    rotation_sequence = [Rotation.CW, Rotation.CW]
 
-    active_piece.rotate(Rotation.CW, matrix=matrix)
-    active_piece.rotate(Rotation.CW, matrix=matrix)
+    maybe_visualize_rotation(
+        matrix,
+        active_piece,
+        rotation_sequence=rotation_sequence,
+    )
 
     assert set(active_piece.position) == set(((2, 6), (2, 7), (3, 6), (4, 6)))
+
+
+def test_t_spin_overhang():
+    matrix = make_matrix()
+    layout_rows = load_layout_rows("t_spin_overhang")
+    apply_layout_to_matrix(matrix, layout_rows)
+
+    active_piece = ActivePiece(piece_type=PieceType.T_PIECE)
+    active_piece.orientation = PieceOrientation.WEST
+    active_piece.position = ((3, 2), (3, 3), (4, 3), (2, 3))
+    rotation_sequence = []
+    rotation_sequence = [Rotation.CCW]
+
+    maybe_visualize_rotation(
+        matrix,
+        active_piece,
+        rotation_sequence=rotation_sequence,
+    )
+
+    assert set(active_piece.position) == set(((3, 2), (3, 3), (3, 4), (2, 3)))
+
+
+def test_t_spin_well():
+    matrix = make_matrix()
+    layout_rows = load_layout_rows("t_spin_well")
+    apply_layout_to_matrix(matrix, layout_rows)
+
+    active_piece = ActivePiece(piece_type=PieceType.T_PIECE)
+    active_piece.orientation = PieceOrientation.EAST
+    active_piece.position = ((10, 1), (9, 1), (9, 2), (8, 1))
+    rotation_sequence = [Rotation.CCW, Rotation.CCW, Rotation.CW, Rotation.CW]
+
+    maybe_visualize_rotation(
+        matrix,
+        active_piece,
+        rotation_sequence=rotation_sequence,
+    )
+
+    assert set(active_piece.position) == set(((4, 1), (3, 1), (3, 2), (2, 1)))
