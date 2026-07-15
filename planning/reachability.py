@@ -1,22 +1,14 @@
 from collections import deque
 
-import pygame
-
-from fixtures.layouts import apply_layout_to_matrix, load_layout_rows
 from matrix import Matrix
 from piece import (
-    ActivePiece,
+    get_anchor,
     get_rotated_position,
     get_translated_position,
     rotate_orientation,
 )
-from planning.placements import generate_initial_final_placement_positions
-from render import Renderer
 from shared import (
-    CONFIG,
     Action,
-    Color,
-    Observation,
     PieceOrientation,
     PieceType,
     Rotation,
@@ -24,23 +16,63 @@ from shared import (
 )
 
 
-def map_reachable_placements_to_actions(
+def _normalize_position(position: tuple[tuple[int, int], ...]) -> tuple[tuple[int, int], ...]:
+    return tuple(sorted(position))
+
+
+def _get_potential_position(
+    piece_type: PieceType,
+    position: tuple[tuple[int, int], ...],
+    orientation: PieceOrientation,
+) -> tuple[tuple[int, int], PieceOrientation]:
+    return (get_anchor(piece_type, position, orientation), orientation)
+
+
+def _get_hard_drop_position(
+    matrix: Matrix,
+    position: tuple[tuple[int, int], ...],
+) -> tuple[tuple[int, int], ...]:
+    current_position = position
+    shifted_position = get_translated_position(TranslateDirection.DOWN, current_position, matrix)
+    while shifted_position is not None:
+        current_position = shifted_position
+        shifted_position = get_translated_position(
+            TranslateDirection.DOWN, current_position, matrix
+        )
+
+    return current_position
+
+
+def map_reachable_positions_to_actions(
     matrix: Matrix,
     current_position: tuple[tuple[int, int], ...],
     current_orientation: PieceOrientation,
     piece_type: PieceType,
-    final_placement_positions: list[tuple[tuple[int, int], ...]],
-) -> dict[tuple[tuple[int, int], ...], tuple[Action, ...]]:
+    potential_positions: list[tuple[tuple[int, int], PieceOrientation]],
+) -> dict[tuple[tuple[int, int], PieceOrientation], tuple[Action, ...]]:
     """Return a mapping of reachable final placement positions to the shortest sequence of actions
     required to get it there.
     """
 
     current_position = tuple(sorted(current_position))
-    final_placement_positions = set(final_placement_positions)
-    position_to_actions: dict[tuple[tuple[int, int], ...], tuple[Action, ...]] = {}
+    potential_positions = set(potential_positions)
+    position_to_actions: dict[tuple[tuple[int, int], PieceOrientation], tuple[Action, ...]] = {}
 
-    queue = deque([(current_position, current_orientation, ())])
-    seen_positions = set()
+    queue = deque([(current_position, current_orientation, (), False)])
+    seen_states = {(current_position, current_orientation, False)}
+
+    def enqueue_state(
+        position: tuple[tuple[int, int], ...],
+        orientation: PieceOrientation,
+        action_history: tuple[Action, ...],
+        hard_dropped: bool,
+    ) -> None:
+        state = (position, orientation, hard_dropped)
+        if state in seen_states:
+            return
+
+        seen_states.add(state)
+        queue.append((position, orientation, action_history, hard_dropped))
 
     actions = (
         Action.HARD_DROP,
@@ -52,17 +84,20 @@ def map_reachable_placements_to_actions(
     )
 
     while queue:
-        position, orientation, action_history = queue.popleft()
-
-        print(position, action_history)
+        position, orientation, action_history, hard_dropped = queue.popleft()
+        potential_position = _get_potential_position(piece_type, position, orientation)
 
         # record the action history only if the position is a final placement position
         # and a shorter sequence has not been recorded
-        if position in final_placement_positions and position not in position_to_actions:
-            position_to_actions[position] = action_history
+        if (
+            potential_position in potential_positions
+            and potential_position not in position_to_actions
+        ):
+            position_to_actions[potential_position] = action_history
+            if len(position_to_actions) == len(potential_positions):
+                break
 
-        # end progression if the last action was not a hard drop
-        if action_history and action_history[-1] == Action.HARD_DROP:
+        if hard_dropped:
             continue
 
         for action in actions:
@@ -72,43 +107,46 @@ def map_reachable_placements_to_actions(
                         TranslateDirection.LEFT, position, matrix
                     )
                     if new_position is not None:
-                        new_position = tuple(sorted(new_position))
-                        if new_position not in seen_positions:
-                            seen_positions.add(new_position)
-                            queue.append((new_position, orientation, action_history + (action,)))
+                        enqueue_state(
+                            _normalize_position(new_position),
+                            orientation,
+                            action_history + (action,),
+                            False,
+                        )
                 case Action.RIGHT_SHIFT:
                     new_position = get_translated_position(
                         TranslateDirection.RIGHT, position, matrix
                     )
                     if new_position is not None:
-                        new_position = tuple(sorted(new_position))
-                        if new_position not in seen_positions:
-                            seen_positions.add(new_position)
-                            queue.append((new_position, orientation, action_history + (action,)))
+                        enqueue_state(
+                            _normalize_position(new_position),
+                            orientation,
+                            action_history + (action,),
+                            False,
+                        )
                 case Action.SOFT_DROP:
                     new_position = get_translated_position(
                         TranslateDirection.DOWN, position, matrix
                     )
                     if new_position is not None:
-                        new_position = tuple(sorted(new_position))
-                        if new_position not in seen_positions:
-                            seen_positions.add(new_position)
-                            queue.append((new_position, orientation, action_history + (action,)))
-                case Action.HARD_DROP:
-                    new_position = position
-                    shifted_position = get_translated_position(
-                        TranslateDirection.DOWN, position, matrix
-                    )
-                    while shifted_position is not None and not matrix.check_collision(
-                        shifted_position
-                    ):
-                        new_position = shifted_position
-                        shifted_position = get_translated_position(
-                            TranslateDirection.DOWN, shifted_position, matrix
+                        enqueue_state(
+                            _normalize_position(new_position),
+                            orientation,
+                            action_history + (action,),
+                            False,
                         )
-                    new_position = tuple(sorted(new_position))
-                    if new_position in final_placement_positions:
-                        queue.append((new_position, orientation, action_history + (action,)))
+                case Action.HARD_DROP:
+                    new_position = _normalize_position(_get_hard_drop_position(matrix, position))
+                    new_potential_position = _get_potential_position(
+                        piece_type, new_position, orientation
+                    )
+                    if new_potential_position in potential_positions:
+                        enqueue_state(
+                            new_position,
+                            orientation,
+                            action_history + (action,),
+                            True,
+                        )
                 case Action.CW_ROTATE:
                     new_position = get_rotated_position(
                         position=position,
@@ -118,15 +156,16 @@ def map_reachable_placements_to_actions(
                         matrix=matrix,
                     )
                     if new_position is not None:
-                        new_position = tuple(sorted(new_position))
+                        new_position = _normalize_position(new_position)
                         new_orientation = rotate_orientation(
                             orientation=orientation, rotation=Rotation.CW
                         )
-                        if new_position not in seen_positions:
-                            seen_positions.add(new_position)
-                            queue.append(
-                                (new_position, new_orientation, action_history + (action,))
-                            )
+                        enqueue_state(
+                            new_position,
+                            new_orientation,
+                            action_history + (action,),
+                            False,
+                        )
                 case Action.CCW_ROTATE:
                     new_position = get_rotated_position(
                         position=position,
@@ -136,20 +175,28 @@ def map_reachable_placements_to_actions(
                         matrix=matrix,
                     )
                     if new_position is not None:
-                        new_position = tuple(sorted(new_position))
+                        new_position = _normalize_position(new_position)
                         new_orientation = rotate_orientation(
                             orientation=orientation, rotation=Rotation.CCW
                         )
-                        if new_position not in seen_positions:
-                            seen_positions.add(new_position)
-                            queue.append(
-                                (new_position, new_orientation, action_history + (action,))
-                            )
+                        enqueue_state(
+                            new_position,
+                            new_orientation,
+                            action_history + (action,),
+                            False,
+                        )
 
     return position_to_actions
 
 
 if __name__ == "__main__":
+    import pygame
+
+    from fixtures.layouts import apply_layout_to_matrix, load_layout_rows
+    from piece import ActivePiece, generate_anchor_relative_position
+    from planning.placements import generate_potential_final_positions
+    from render import Renderer
+    from shared import CONFIG, Color, Observation
 
     def generate_observation(matrix: Matrix, active_piece: ActivePiece):
         return Observation(
@@ -187,31 +234,29 @@ if __name__ == "__main__":
     renderer = Renderer()
     clock = pygame.time.Clock()
 
-    final_placement_positions = generate_initial_final_placement_positions(
-        matrix, PieceType.L_PIECE
-    )
+    final_placement_positions = generate_potential_final_positions(matrix, PieceType.L_PIECE)
 
     active_piece = ActivePiece(PieceType.L_PIECE)
 
-    placements_to_actions = map_reachable_placements_to_actions(
+    position_to_actions = map_reachable_positions_to_actions(
         matrix=matrix,
         current_position=active_piece.position,
         current_orientation=active_piece.orientation,
         piece_type=PieceType.L_PIECE,
-        final_placement_positions=final_placement_positions,
+        potential_positions=final_placement_positions,
     )
 
-    for position in final_placement_positions:
-        if position not in final_placement_positions:
+    for final_position in final_placement_positions:
+        if final_position not in position_to_actions:
             continue
-        action_sequence = placements_to_actions[position]
+        action_sequence = position_to_actions[final_position]
         active_piece = ActivePiece(PieceType.L_PIECE)
+        anchor, orientation = final_position
 
         matrix_copy = matrix.clone()
+        position = generate_anchor_relative_position(PieceType.L_PIECE, orientation, anchor)
         for row, col in position:
             matrix_copy[row][col] = Color.PINK
-
-        print(position, action_sequence)
 
         renderer.render(generate_observation(matrix_copy, active_piece))
         for action in action_sequence:
