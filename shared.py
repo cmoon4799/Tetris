@@ -128,3 +128,8 @@ class TranslateDirection(Enum):
     DOWN = auto()
     LEFT = auto()
     RIGHT = auto()
+
+
+class Rotation(Enum):
+    CW = auto()
+    CCW = auto()

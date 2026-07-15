@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from shared import Color
 
 
@@ -8,7 +10,6 @@ class Matrix:
         self._matrix: list[list[Color | None]] = [
             [None for _ in range(matrix_width)] for _ in range(matrix_height)
         ]
-        self.lines_cleared: int = 0
 
     def check_collision(self, position: tuple[tuple[int, int], ...]) -> bool:
         """Check if the provided position collides with existing pieces of the matrix or the walls
@@ -28,13 +29,14 @@ class Matrix:
 
         return False
 
-    def clear(self) -> None:
+    def clear(self) -> int:
         surviving_rows = []
+        lines_cleared = 0
         for row in self._matrix:
             if any(cell is None for cell in row):
                 surviving_rows.append(row)
             else:
-                self.lines_cleared += 1
+                lines_cleared += 1
 
         self._matrix = [*surviving_rows]
         self._matrix += [
@@ -42,8 +44,15 @@ class Matrix:
             for _ in range(self.matrix_height - len(surviving_rows))
         ]
 
+        return lines_cleared
+
     def snapshot(self) -> tuple[tuple[int]]:
         return tuple(tuple(row) for row in self._matrix)
+
+    def clone(self) -> Matrix:
+        copy = self.__class__(matrix_width=self.matrix_width, matrix_height=self.matrix_height)
+        copy._matrix = [list(row) for row in self._matrix]
+        return copy
 
     def __getitem__(self, index: int) -> list[Color | None]:
         if not 0 <= index < self.matrix_height:

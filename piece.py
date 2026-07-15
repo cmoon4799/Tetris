@@ -1,8 +1,7 @@
-from enum import Enum, auto
 from random import Random
 
 from matrix import Matrix
-from shared import CONFIG, Color, PieceOrientation, PieceType, TranslateDirection
+from shared import CONFIG, Color, PieceOrientation, PieceType, Rotation, TranslateDirection
 
 PIECE_TO_COLOR_MAP = {
     PieceType.I_PIECE: Color.LIGHT_BLUE,
@@ -185,11 +184,6 @@ I_KICK_DATA: dict[
 }
 
 
-class Rotation(Enum):
-    CW = auto()
-    CCW = auto()
-
-
 def generate_random_bag(rng: Random) -> list[PieceType]:
     bag = list(PieceType)
     rng.shuffle(bag)
@@ -211,6 +205,7 @@ class ActivePiece:
         self.right_translations = 0
         self.down_translations = 0
 
+        # TODO: remove
         # these flags are used to penalize useless stuttering, i.e. back and
         # forth movement that causes the piece to stay in place;  it is reset
         # on every translation
@@ -267,77 +262,19 @@ class ActivePiece:
                     (spawn_row, left_spawn_col + 2),
                 )
 
-    def get_translated_position(self, direction: TranslateDirection) -> tuple[tuple[int, int], ...]:
-        """Return the would be position in the matrix without translating the piece."""
-
-        match direction:
-            case TranslateDirection.DOWN:
-                return tuple((i - 1, j) for (i, j) in self.position)
-            case TranslateDirection.LEFT:
-                return tuple((i, j - 1) for (i, j) in self.position)
-            case TranslateDirection.RIGHT:
-                return tuple((i, j + 1) for (i, j) in self.position)
-
-    def get_rotated_position(
-        self, rotation: Rotation, matrix: Matrix
-    ) -> tuple[tuple[int, int], ...] | None:
-        """Return the would be position in the matrix without rotating the piece; if rotation is not
-        possible, return None.
-        """
-
-        match self.piece_type:
-            case PieceType.I_PIECE:
-                return rotate_i_piece(
-                    matrix,
-                    self.position,
-                    self.orientation,
-                    rotation,
-                )
-            case PieceType.T_PIECE:
-                return rotate_t_piece(
-                    matrix,
-                    self.position,
-                    self.orientation,
-                    rotation,
-                )
-            case PieceType.L_PIECE:
-                return rotate_l_piece(
-                    matrix,
-                    self.position,
-                    self.orientation,
-                    rotation,
-                )
-            case PieceType.J_PIECE:
-                return rotate_j_piece(
-                    matrix,
-                    self.position,
-                    self.orientation,
-                    rotation,
-                )
-            case PieceType.S_PIECE:
-                return rotate_s_piece(
-                    matrix,
-                    self.position,
-                    self.orientation,
-                    rotation,
-                )
-            case PieceType.Z_PIECE:
-                return rotate_z_piece(
-                    matrix,
-                    self.position,
-                    self.orientation,
-                    rotation,
-                )
-            case PieceType.O_PIECE:
-                return None
-
     def rotate(self, rotation: Rotation, matrix: Matrix) -> bool:
         """Rotate the active piece and return a boolean indicating rotation success."""
 
         self.left_shifted = False
         self.right_shifted = False
 
-        rotated_position = self.get_rotated_position(rotation, matrix)
+        rotated_position = get_rotated_position(
+            position=self.position,
+            piece_type=self.piece_type,
+            rotation=rotation,
+            orientation=self.orientation,
+            matrix=matrix,
+        )
         if rotated_position is not None:
             self.position = rotated_position
             self.orientation = rotate_orientation(self.orientation, rotation)
@@ -351,8 +288,8 @@ class ActivePiece:
         self.left_shifted = False
         self.right_shifted = False
 
-        translated_position = self.get_translated_position(direction)
-        if not matrix.check_collision(translated_position):
+        translated_position = get_translated_position(direction, self.position, matrix)
+        if translated_position is not None:
             self.position = translated_position
             match direction:
                 case TranslateDirection.LEFT:
@@ -364,6 +301,7 @@ class ActivePiece:
                 case TranslateDirection.DOWN:
                     self.down_translations += 1
             return True
+
         return False
 
     @property
@@ -381,6 +319,91 @@ class ActivePiece:
     @property
     def max_col(self):
         return max(j for (i, j) in self.position)
+
+
+def get_translated_position(
+    direction: TranslateDirection,
+    position: tuple[tuple[int, int], ...],
+    matrix: Matrix,
+) -> tuple[tuple[int, int], ...]:
+    """Return the would be position in the matrix without translating the piece; if translation is
+    not possible, return None.
+    """
+
+    match direction:
+        case TranslateDirection.DOWN:
+            new_position = tuple((i - 1, j) for (i, j) in position)
+        case TranslateDirection.LEFT:
+            new_position = tuple((i, j - 1) for (i, j) in position)
+        case TranslateDirection.RIGHT:
+            new_position = tuple((i, j + 1) for (i, j) in position)
+
+    return new_position if not matrix.check_collision(new_position) else None
+
+
+def get_rotated_position(
+    position: tuple[tuple[int, int], ...],
+    piece_type: PieceType,
+    rotation: Rotation,
+    orientation: PieceOrientation,
+    matrix: Matrix,
+) -> tuple[tuple[int, int], ...] | None:
+    """Return the would be position in the matrix without rotating the piece; if rotation is not
+    possible, return None.
+    """
+
+    match piece_type:
+        case PieceType.I_PIECE:
+            return rotate_i_piece(
+                matrix,
+                position,
+                orientation,
+                rotation,
+            )
+        case PieceType.T_PIECE:
+            return rotate_t_piece(
+                matrix,
+                position,
+                orientation,
+                rotation,
+            )
+        case PieceType.L_PIECE:
+            return rotate_l_piece(
+                matrix,
+                position,
+                orientation,
+                rotation,
+            )
+        case PieceType.J_PIECE:
+            return rotate_j_piece(
+                matrix,
+                position,
+                orientation,
+                rotation,
+            )
+        case PieceType.S_PIECE:
+            return rotate_s_piece(
+                matrix,
+                position,
+                orientation,
+                rotation,
+            )
+        case PieceType.Z_PIECE:
+            return rotate_z_piece(
+                matrix,
+                position,
+                orientation,
+                rotation,
+            )
+        case PieceType.O_PIECE:
+            return None
+
+
+def rotate_orientation(orientation: PieceOrientation, rotation: Rotation) -> PieceOrientation:
+    if rotation == Rotation.CW:
+        return list(PieceOrientation)[orientation.value % 4]
+    else:
+        return list(PieceOrientation)[(orientation.value - 2) % 4]
 
 
 def get_anchor(
@@ -424,8 +447,8 @@ def generate_anchor_relative_position(
     piece_type: PieceType, orientation: PieceOrientation, anchor: tuple[int, int]
 ) -> tuple[tuple[int, int], ...]:
     """Generate cell positions of a piece relative to an anchor point according to the piece type
-    and orientation. Each cell is represented as (x, y), meaning its position in the matrix is
-    (anchor_x + x, anchor_y + y).
+    and orientation. Each cell is represented as (y, x), meaning its position in the matrix is
+    (anchor_y + y, anchor_x + x).
     """
 
     anchor_row, anchor_col = anchor
@@ -597,13 +620,6 @@ def generate_anchor_relative_position(
                 (anchor_row, anchor_col + 1),
                 (anchor_row, anchor_col + 2),
             ]
-
-
-def rotate_orientation(orientation: PieceOrientation, rotation: Rotation) -> PieceOrientation:
-    if rotation == Rotation.CW:
-        return list(PieceOrientation)[orientation.value % 4]
-    else:
-        return list(PieceOrientation)[(orientation.value - 2) % 4]
 
 
 def rotate_i_piece(

@@ -6,8 +6,9 @@ from typing import Callable
 from matrix import Matrix
 from piece import (
     ActivePiece,
-    Rotation,
     generate_random_bag,
+    get_rotated_position,
+    get_translated_position,
 )
 from shared import (
     CONFIG,
@@ -15,6 +16,7 @@ from shared import (
     Action,
     Observation,
     PieceType,
+    Rotation,
     RunOutcome,
     TranslateDirection,
 )
@@ -65,6 +67,7 @@ class Engine:
 
         self.held_piece: PieceType | None = None
         self.hold_disabled: bool = False
+        self.lines_cleared = 0
 
         self.active_piece: ActivePiece = ActivePiece(self.piece_queue.popleft())
         self.action_queue = deque()
@@ -178,7 +181,7 @@ class Engine:
     def check_win_condition(self, result: ActionResult) -> bool:
         """Check the victory condition and returns whether the condition has been met."""
 
-        if self.matrix.lines_cleared >= self.LINE_CLEAR_GOAL:
+        if self.lines_cleared >= self.LINE_CLEAR_GOAL:
             self.run_outcome = RunOutcome.VICTORY
             self.running = False
             return True
@@ -206,7 +209,7 @@ class Engine:
         for i, j in self.active_piece.position:
             self.matrix[i][j] = self.active_piece.color
 
-        self.matrix.clear()
+        self.lines_cleared += self.matrix.clear()
 
         self.hold_disabled = False
 
@@ -219,14 +222,10 @@ class Engine:
         return ActionResult(success)
 
     def left_shift(self) -> ActionResult:
-        if self.active_piece.right_shifted:
-            print("left shifting when right shifted")
         success = self.active_piece.translate(TranslateDirection.LEFT, self.matrix)
         return ActionResult(success)
 
     def right_shift(self) -> ActionResult:
-        if self.active_piece.left_shifted:
-            print("right shifting when left shifted")
         success = self.active_piece.translate(TranslateDirection.RIGHT, self.matrix)
         return ActionResult(success)
 
@@ -266,8 +265,14 @@ class Engine:
     # --- Utilities ---
 
     def surface_contact(self) -> bool:
-        new_position = self.active_piece.get_translated_position(TranslateDirection.DOWN)
-        return self.matrix.check_collision(new_position)
+        return (
+            get_translated_position(
+                TranslateDirection.DOWN,
+                self.active_piece.position,
+                self.matrix,
+            )
+            is None
+        )
 
     def build_action_mask(self) -> tuple[bool]:
         mask = [False for _ in range(len(PLAYER_ACTION_SPACE))]
@@ -281,23 +286,29 @@ class Engine:
                     if self.active_piece.right_shifted:
                         mask[i] = False
                         continue
-                    new_position = self.active_piece.get_translated_position(
-                        TranslateDirection.LEFT
+                    new_position = get_translated_position(
+                        TranslateDirection.LEFT,
+                        self.active_piece.position,
+                        self.matrix,
                     )
-                    mask[i] = not self.matrix.check_collision(new_position)
+                    mask[i] = new_position is not None
                 case Action.RIGHT_SHIFT:
                     if self.active_piece.left_shifted:
                         mask[i] = False
                         continue
-                    new_position = self.active_piece.get_translated_position(
-                        TranslateDirection.RIGHT
+                    new_position = get_translated_position(
+                        TranslateDirection.RIGHT,
+                        self.active_piece.position,
+                        self.matrix,
                     )
-                    mask[i] = not self.matrix.check_collision(new_position)
+                    mask[i] = new_position is not None
                 case Action.SOFT_DROP:
-                    new_position = self.active_piece.get_translated_position(
-                        TranslateDirection.DOWN
+                    new_position = get_translated_position(
+                        TranslateDirection.DOWN,
+                        self.active_piece.position,
+                        self.matrix,
                     )
-                    mask[i] = not self.matrix.check_collision(new_position)
+                    mask[i] = new_position is not None
                 case Action.HARD_DROP:
                     mask[i] = True
                 case Action.CW_ROTATE:
@@ -308,7 +319,14 @@ class Engine:
                         mask[i] = False
                         continue
                     mask[i] = (
-                        self.active_piece.get_rotated_position(Rotation.CW, self.matrix) is not None
+                        get_rotated_position(
+                            position=self.active_piece.position,
+                            piece_type=self.active_piece.piece_type,
+                            rotation=Rotation.CW,
+                            orientation=self.active_piece.orientation,
+                            matrix=self.matrix,
+                        )
+                        is not None
                     )
                 case Action.CCW_ROTATE:
                     if (
@@ -318,7 +336,13 @@ class Engine:
                         mask[i] = False
                         continue
                     mask[i] = (
-                        self.active_piece.get_rotated_position(Rotation.CCW, self.matrix)
+                        get_rotated_position(
+                            position=self.active_piece.position,
+                            piece_type=self.active_piece.piece_type,
+                            rotation=Rotation.CCW,
+                            orientation=self.active_piece.orientation,
+                            matrix=self.matrix,
+                        )
                         is not None
                     )
                 case Action.HOLD:
@@ -328,7 +352,7 @@ class Engine:
 
     def build_observation(self) -> Observation:
         gravity_frames_remaining = self.gravity_frame_rate - (
-            self.frame_ticks % self.gravity_frame_rate
+            self.gravity_frame_ticks % self.gravity_frame_rate
         )
         lock_down_frames_remaining = self.lock_down_frame_rate - self.lock_down_frame_ticks
         lock_down_resets_remaining = self.lock_down_reset_limit - self.lock_down_reset_count
@@ -346,7 +370,7 @@ class Engine:
             lock_down_active=self.lock_down_active,
             lock_down_frames_remaining=lock_down_frames_remaining,
             lock_down_resets_remaining=lock_down_resets_remaining,
-            lines_cleared=self.matrix.lines_cleared,
+            lines_cleared=self.lines_cleared,
             run_outcome=self.run_outcome,
             active_piece_rotations=self.active_piece.rotations,
             active_piece_left_translations=self.active_piece.left_translations,
