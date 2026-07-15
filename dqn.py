@@ -1,6 +1,5 @@
 import os
 import random
-import time
 from collections import deque
 from typing import NamedTuple, Sequence
 
@@ -389,11 +388,10 @@ class Trainer:
             flat = self.agent.tensorize_flat_features(observation)
             action_mask = torch.tensor(observation.action_mask, dtype=torch.bool)
 
-            renderer = Renderer(engine=engine)
+            renderer = Renderer()
 
             while engine.running:
-                if renderer is not None:
-                    renderer.render()
+                renderer.render(observation)
 
                 action = self.agent.select_action(spatial, flat, action_mask, self.epsilon)
 
@@ -405,8 +403,6 @@ class Trainer:
                 next_action_mask = torch.tensor(next_observation.action_mask, dtype=torch.bool)
 
                 reward = self.compute_reward(observation, next_observation, action)
-                print(reward)
-
                 self.agent.replay_buffer.push(
                     spatial=spatial,
                     flat=flat,
@@ -426,8 +422,6 @@ class Trainer:
                 )
 
                 self.agent.train_step(self.batch_size)
-
-                time.sleep(0.05)
 
             print(
                 f"""
@@ -496,29 +490,22 @@ class Trainer:
 
         lines_cleared = observation2.lines_cleared - observation1.lines_cleared
         reward += w_lines_cleared * lines_cleared**2
-        print("lines cleared reward: ", w_lines_cleared * lines_cleared**2)
 
         holes1 = self.compute_holes(observation1.matrix)
         holes2 = self.compute_holes(observation2.matrix)
         reward -= w_holes * (holes2 - holes1)
-        print("holes penalty: ", w_holes * (holes2 - holes1))
 
         spike1 = self.compute_spikiness(observation1.matrix)
         spike2 = self.compute_spikiness(observation2.matrix)
         reward -= w_spike * (spike2 - spike1)
-        print("spikes penalty: ", w_spike * (spike2 - spike1))
 
         bump1 = self.compute_bumpiness(observation1.matrix)
         bump2 = self.compute_bumpiness(observation2.matrix)
         reward -= w_bump * (bump2 - bump1)
-        print("bump penalty: ", w_bump * (bump2 - bump1))
 
         max_height1 = self.compute_max_height(observation1.matrix)
         max_height2 = self.compute_max_height(observation2.matrix)
         reward -= w_max_height * (max_height2 - max_height1)
-        print("max height penalty: ", w_max_height * (max_height2 - max_height1))
-
-        print("total: ", reward)
 
         if observation2.run_outcome == RunOutcome.VICTORY:
             return reward + victory_reward

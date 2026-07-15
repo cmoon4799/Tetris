@@ -70,6 +70,8 @@ class Engine:
         self.action_queue = deque()
 
         self.gravity_frame_rate = self.GRAVITY_SPEED * self.FPS
+        self.gravity_frame_ticks = 0
+
         self.lock_down_frame_rate = self.LOCK_DOWN_SPEED * self.FPS
         self.lock_down_reset_limit = self.LOCK_DOWN_RESET_LIMIT
         self.lock_down_active = False
@@ -99,12 +101,13 @@ class Engine:
             if not isinstance(action, Action) or action in self.RESTRICTED_ACTIONS:
                 raise ValueError(f"Provided input {action} is not a valid player action.")
 
+        self.action_queue.clear()
+        self.action_queue.extend(actions)
+
         self.frame_ticks += 1
         if self.lock_down_active:
             self.lock_down_frame_ticks += 1
-
-        self.action_queue.clear()
-        self.action_queue.extend(actions)
+        self.gravity_frame_ticks += 1
 
         if self.lock_down_active:
             if (
@@ -112,7 +115,8 @@ class Engine:
                 or self.lock_down_reset_count >= self.lock_down_reset_limit
             ) and self.surface_contact():
                 self.action_queue.appendleft(Action.LOCK_DOWN)
-        if self.frame_ticks > 0 and self.frame_ticks % self.gravity_frame_rate == 0:
+
+        if self.gravity_frame_ticks > 0 and self.gravity_frame_ticks % self.gravity_frame_rate == 0:
             self.action_queue.appendleft(Action.FALL)
 
         while self.action_queue:
@@ -182,6 +186,7 @@ class Engine:
 
     def pull_active_piece_from_queue(self) -> None:
         self.switch_off_lock_down()
+        self.gravity_frame_ticks = 0
 
         self.active_piece = ActivePiece(self.piece_queue.popleft())
         self.piece_queue.append(self.piece_bag.popleft())
