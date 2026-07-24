@@ -1,4 +1,4 @@
-Implemented using the 2009 Tetris Design Guideline
+A neural network to play Tetris. Implemented using the 2009 Tetris Design Guideline.
 
 ## TODO
 
